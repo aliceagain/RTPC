@@ -34,6 +34,7 @@ void JoinGame(){
   BITBAND_PERI(P1->OUT, 0) ^= 1;  //toggle led on
   
   LCD_Init(false);
+  LCD_Clear(LCD_GRAY);
   LCD_DrawRectangle(ARENA_MIN_X, ARENA_MAX_X, ARENA_MIN_X, ARENA_MAX_Y,LCD_BLACK);
 
   //change priorities later
@@ -105,6 +106,7 @@ void CreateGame(){
   BITBAND_PERI(P1->OUT, 0) ^= 1;  //toggle led on
 
   LCD_Init(false);
+  LCD_Clear(LCD_GRAY);
   LCD_DrawRectangle(ARENA_MIN_X, ARENA_MAX_X, ARENA_MIN_X, ARENA_MAX_Y,LCD_BLACK);
   while(1);
 }
