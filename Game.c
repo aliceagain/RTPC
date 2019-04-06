@@ -12,6 +12,9 @@ semaphore_t cc3100;
 void JoinGame(){
   initCC3100(Client);
 
+  G8RTOS_InitSemaphore(&lcd, 1);
+  G8RTOS_InitSemaphore(&cc3100, 1);
+
   //init specific player info for client
   gameState.player.IP_address = getLocalIP();
   gameState.player.displacement = 0;
@@ -24,7 +27,7 @@ void JoinGame(){
 
   while(ReceiveData((uint8_t *)&gameState.player, sizeof(SpecificPlayerInfo_t)) == NOTHING_RECEIVED);
 
-  while(1);
+  while(1){
 }
 
 /*
