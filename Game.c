@@ -12,7 +12,6 @@ void JoinGame(){
   G8RTOS_InitSemaphore(&cc3100, 1);
   initCC3100(Client);
 
-  G8RTOS_InitSemaphore(&lcd, 1);
   G8RTOS_InitSemaphore(&cc3100, 1);
 
   //init specific player info for client
@@ -183,7 +182,7 @@ void DrawObjects(){
         }
         if(gameStatePrev.balls[i].currentCenterY != gameState.balls[i].currentCenterY){
           
-          gameStatePrev.balls[i].currentCenterY != gameState.balls[i].currentCenterY;
+          gameStatePrev.balls[i].currentCenterY = gameState.balls[i].currentCenterY;
         }
       }else if(gameStatePrev.balls[i].alive != gameState.balls[i].alive){
         
