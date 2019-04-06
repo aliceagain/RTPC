@@ -66,8 +66,8 @@ void EndOfGameClient(){
  */
 void CreateGame(){
   G8RTOS_AddThread(IdleThread,255,NULL);
-  G8RTOS_InitSemaphore(&lcd, 0);
-  G8RTOS_InitSemaphore(&cc3100, 0);
+  G8RTOS_InitSemaphore(&lcd, 1);
+  G8RTOS_InitSemaphore(&cc3100, 1);
 
   gameState.players[Host]= (GeneralPlayerInfo_t){PADDLE_X_CENTER, PLAYER_RED, BOTTOM};
   gameState.players[Client]= (GeneralPlayerInfo_t){PADDLE_X_CENTER, PLAYER_BLUE, TOP};
