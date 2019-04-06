@@ -2,6 +2,8 @@
 
 /*********************************************** Global Vars *********************************************************************/
 GameState_t gameState;
+semaphore_t lcd;
+semaphore_t cc3100;
 
 /*********************************************** Client Threads *********************************************************************/
 /*
@@ -9,6 +11,19 @@ GameState_t gameState;
  */
 void JoinGame(){
   initCC3100(Client);
+
+  //init specific player info for client
+  gameState.player.IP_address = getLocalIP();
+  gameState.player.displacement = 0;
+  gameState.player.playerNumber = Client;  //0 = client, 1 = host
+  gameState.player.ready = true;
+  gameState.player.joined = false;
+  gameState.player.acknowledge = false;
+
+  SendData((uint8_t *)&gameState.player, HOST_IP_ADDR, sizeof(SpecificPlayerInfo_t));
+
+  while(ReceiveData((uint8_t *)&gameState.player, sizeof(SpecificPlayerInfo_t)) == NOTHING_RECEIVED);
+
   while(1);
 }
 
@@ -47,7 +62,21 @@ void EndOfGameClient(){
  * Thread for the host to create a game
  */
 void CreateGame(){
+  G8RTOS_AddThread(IdleThread,255,NULL);
+  G8RTOS_InitSemaphore(&lcd, 0);
+  G8RTOS_InitSemaphore(&cc3100, 0);
+
+  gameState.players[Host]= (GeneralPlayerInfo_t){PADDLE_X_CENTER, PLAYER_RED, BOTTOM};
+  gameState.players[Client]= (GeneralPlayerInfo_t){PADDLE_X_CENTER, PLAYER_BLUE, TOP};
+
+  G8RTOS_WaitSemaphore(&cc3100);
   initCC3100(Host);
+
+  while(ReceiveData((uint8_t * )&gameState.player, sizeof(SpecificPlayerInfo_t)) == NOTHING_RECEIVED);
+  gameState.player.joined = true;
+  gameState.player.acknowledge = true;
+  SendData((uint8_t * ) &gameState.player, gameState.player.IP_address, sizeof(gameState.player));
+  G8RTOS_SignalSemaphore(&cc3100);
   while(1);
 }
 
