@@ -19,7 +19,8 @@
 /*********************************************** Externs ********************************************************************/
 
 /* Semaphores here */ 
-
+semaphore_t cc3100;
+semaphore_t lcd;
 /*********************************************** Externs ********************************************************************/
 
 /*********************************************** Global Defines ********************************************************************/
@@ -50,7 +51,7 @@
 #define HORIZ_CENTER_MAX_PL          (ARENA_MAX_X - PADDLE_LEN_D2)
 #define HORIZ_CENTER_MIN_PL          (ARENA_MIN_X + PADDLE_LEN_D2)
 
-/* Constant enters of each player */
+/* Constant centers of each player */
 #define TOP_PLAYER_CENTER_Y          (ARENA_MIN_Y + PADDLE_WID_D2)
 #define BOTTOM_PLAYER_CENTER_Y       (ARENA_MAX_Y - PADDLE_WID_D2)
 
@@ -86,6 +87,10 @@
 /* Used as status LEDs for Wi-Fi */
 #define BLUE_LED BIT2
 #define RED_LED BIT0
+
+/* Used for different FIFO names */
+#define JOYSTICK_CLIENTFIFO CLIENT
+#define JOYSTICK_HOSTFIFO HOST
 
 /* Enums for player colors */
 typedef enum
@@ -152,8 +157,8 @@ typedef struct
     uint16_t numberOfBalls;
     bool winner;
     bool gameDone;
-    uint8_t LEDScores[2];
-    uint8_t overallScores[2];
+    uint8_t LEDScores[MAX_NUM_OF_PLAYERS];
+    uint8_t overallScores[MAX_NUM_OF_PLAYERS];
 } GameState_t;
 #pragma pack ( pop )
 

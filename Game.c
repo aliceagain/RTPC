@@ -2,7 +2,6 @@
 
 /*********************************************** Global Vars *********************************************************************/
 GameState_t gameState;
-semaphore_t cc3100;
 
 /*********************************************** Client Threads *********************************************************************/
 /*
@@ -10,13 +9,17 @@ semaphore_t cc3100;
  */
 void JoinGame(){
   G8RTOS_InitSemaphore(&cc3100, 1);
+  G8RTOS_InitSemaphore(&lcd, 1);
   initCC3100(Client);
 
   G8RTOS_InitSemaphore(&cc3100, 1);
 
+  int16_t xcoord, ycoord; //just used to initialize joystick displacement (y not necessary)
+  GetJoystickCoordinates(&xcoord, &ycoord);
+
   //init specific player info for client
   gameState.player.IP_address = getLocalIP();
-  gameState.player.displacement = 0;
+  gameState.player.displacement = xcoord;
   gameState.player.playerNumber = Client;  //0 = client, 1 = host
   gameState.player.ready = true;
   gameState.player.joined = false;
@@ -30,22 +33,24 @@ void JoinGame(){
   while(ReceiveData((uint8_t *)&gameState.player, sizeof(SpecificPlayerInfo_t)) == NOTHING_RECEIVED);
   G8RTOS_SignalSemaphore(&cc3100);
 
-  P1->DIR |= BIT0;  //p1.0 set to output
-  BITBAND_PERI(P1->OUT, 0) ^= 1;  //toggle led on
+  P2->DIR |= BLUE_LED;  //p1.0 set to output
+  BITBAND_PERI(P2->OUT, 2) = 1;  //toggle led on
   
+  G8RTOS_WaitSemaphore(&lcd);
   LCD_Init(false);
   LCD_Clear(LCD_GRAY);
-  LCD_DrawRectangle(ARENA_MIN_X, ARENA_MAX_X, ARENA_MIN_X, ARENA_MAX_Y,LCD_BLACK);
+  LCD_DrawRectangle(ARENA_MIN_X, ARENA_MAX_X, ARENA_MIN_X, ARENA_MAX_Y,BACK_COLOR);
+  G8RTOS_SignalSemaphore(&lcd);
 
   //change priorities later
-  // G8RTOS_AddThread(ReadJoystickClient, 4, NULL);
-  // G8RTOS_AddThread(SendDataToHost, 8, NULL);
-  // G8RTOS_AddThread(ReceiveDataFromHost, 6, NULL);
-  // G8RTOS_AddThread(DrawObjects, 5, NULL);
-  // G8RTOS_AddThread(MoveLEDs, 250, NULL);
-  // G8RTOS_AddThread(Idle, 255, NULL);
+  G8RTOS_AddThread(ReadJoystickClient, 4, NULL);
+  G8RTOS_AddThread(SendDataToHost, 8, NULL);
+  G8RTOS_AddThread(ReceiveDataFromHost, 6, NULL);
+  G8RTOS_AddThread(DrawObjects, 5, NULL);
+  G8RTOS_AddThread(MoveLEDs, 250, NULL);
+  G8RTOS_AddThread(Idle, 255, NULL);
   
-  // G8RTOS_KillSelf();
+  G8RTOS_KillSelf();
   
   while(1);
 }
@@ -68,9 +73,16 @@ void SendDataToHost(){
  * Thread to read client's joystick
  */
 void ReadJoystickClient(){
+  int16_t xcoord, ycoord; //ycoord not needed
+  G8RTOS_InitFIFO(JOYSTICK_CLIENTFIFO);
+  int16_t  
   while(1){
-
+    GetJoystickCoordinates(&xcoord, &ycoord);   //read x coord;
+    
+    sleep(10);
   }
+  
+  
 }
 
 /*
@@ -89,6 +101,7 @@ void EndOfGameClient(){
 void CreateGame(){
   G8RTOS_AddThread(IdleThread,255,NULL);
   G8RTOS_InitSemaphore(&cc3100, 1);
+  G8RTOS_InitSemaphore(&lcd, 1);
 
   gameState.players[Host]= (GeneralPlayerInfo_t){PADDLE_X_CENTER, PLAYER_RED, BOTTOM};
   gameState.players[Client]= (GeneralPlayerInfo_t){PADDLE_X_CENTER, PLAYER_BLUE, TOP};
@@ -102,12 +115,26 @@ void CreateGame(){
   SendData((uint8_t * ) &gameState.player, gameState.player.IP_address, sizeof(gameState.player));
   G8RTOS_SignalSemaphore(&cc3100);
 
-  P1->DIR |= BIT0;  //p1.0 set to output
-  BITBAND_PERI(P1->OUT, 0) ^= 1;  //toggle led on
+  P2->DIR |= RED_LED;  //p1.0 set to output
+  BITBAND_PERI(P2->OUT, 0) = 1;  //toggle led on
 
+  G8RTOS_WaitSemaphore(&lcd);
   LCD_Init(false);
   LCD_Clear(LCD_GRAY);
   LCD_DrawRectangle(ARENA_MIN_X, ARENA_MAX_X, ARENA_MIN_X, ARENA_MAX_Y,LCD_BLACK);
+  G8RTOS_SignalSemaphore(&lcd);
+
+  //change priorities later
+  G8RTOS_AddThread(GenerateBall, 0, NULL);
+  G8RTOS_AddThread(DrawObjects, 0, NULL);
+  G8RTOS_AddThread(ReadJoystickHost, 0, NULL);
+  G8RTOS_AddThread(SendDataToClient, 0, NULL);
+  G8RTOS_AddThread(ReceiveDataFromClient, 0, NULL);
+  G8RTOS_AddThread(MoveLEDs, 0, NULL)
+  G8RTOS_AddThread(Idle, 255, NULL);
+
+  G8RTOS_KillSelf();
+
   while(1);
 }
 
@@ -136,7 +163,13 @@ void GenerateBall(){
  * Thread to read host's joystick
  */
 void ReadJoystickHost(){
-
+  int16_t xcoord, ycoord; //ycoord not needed
+  G8RTOS_InitFIFO(JOYSTICK_HOSTFIFO); 
+  while(1){
+    GetJoystickCoordinates(&xcoord, &ycoord);   //read x coord;
+    writeFIFO(JOYSTICK_HOSTFIFO,xcoord);
+    sleep(10);
+  }  
 }
 
 /*
@@ -168,29 +201,123 @@ void IdleThread(){
  * Thread to draw all the objects in the game
  */
 void DrawObjects(){
-  GameState_t gameStatePrev = gameState;
+  GameState_t gameStatePrev;
   while(1){
     for(int i = 0; i < MAX_NUM_OF_PLAYERS; i++){
       if(gameStatePrev.players[i].position != gameState.players[i].position){
-
+        int16_t posDiff = gameState.players[i].position - gameStatePrev.players[i].position;
+        if(posDiff > 0 && posDiff < PADDLE_LEN_D2 ){
+          if(i == 0){
+            LCD_DrawRectangle(gameState.players[i].position+PADDLE_LEN_D2,
+                              gameStatePrev.players[i].position+PADDLE_LEN_D2,
+                              HORIZ_CENTER_MAX_PL+PADDLE_WID_D2,
+                              HORIZ_CENTER_MAX_PL-PADDLE_WID_D2,
+                              BACK_COLOR);
+            LCD_DrawRectangle(gameState.players[i].position-PADDLE_LEN_D2,
+                              gameStatePrev.players[i].position-PADDLE_LEN_D2,
+                              HORIZ_CENTER_MAX_PL+PADDLE_WID_D2,
+                              HORIZ_CENTER_MAX_PL-PADDLE_WID_D2,
+                              PLAYER_RED);
+          }else{
+            LCD_DrawRectangle(gameState.players[i].position+PADDLE_LEN_D2,
+                              gameStatePrev.players[i].position+PADDLE_LEN_D2,
+                              HORIZ_CENTER_MIN_PL+PADDLE_WID_D2,
+                              HORIZ_CENTER_MIN_PL-PADDLE_WID_D2,
+                              BACK_COLOR);
+            LCD_DrawRectangle(gameState.players[i].position-PADDLE_LEN_D2,
+                              gameStatePrev.players[i].position-PADDLE_LEN_D2,
+                              HORIZ_CENTER_MAX_PL+PADDLE_WID_D2,
+                              HORIZ_CENTER_MAX_PL-PADDLE_WID_D2,
+                              PLAYER_BLUE);
+          }
+        }else if(posDiff < 0 && posDiff > -PADDLE_LEN_D2){
+          if(i == 0){
+            LCD_DrawRectangle(gameState.players[i].position-PADDLE_LEN_D2,
+                              gameStatePrev.players[i].position-PADDLE_LEN_D2,
+                              HORIZ_CENTER_MAX_PL+PADDLE_WID_D2,
+                              HORIZ_CENTER_MAX_PL-PADDLE_WID_D2,
+                              BACK_COLOR);
+            LCD_DrawRectangle(gameState.players[i].position+PADDLE_LEN_D2,
+                              gameStatePrev.players[i].position+PADDLE_LEN_D2,
+                              HORIZ_CENTER_MAX_PL+PADDLE_WID_D2,
+                              HORIZ_CENTER_MAX_PL-PADDLE_WID_D2,
+                              PLAYER_RED);
+          }else{
+            LCD_DrawRectangle(gameState.players[i].position-PADDLE_LEN_D2,
+                              gameStatePrev.players[i].position-PADDLE_LEN_D2,
+                              HORIZ_CENTER_MIN_PL+PADDLE_WID_D2,
+                              HORIZ_CENTER_MIN_PL-PADDLE_WID_D2,
+                              BACK_COLOR);
+            LCD_DrawRectangle(gameState.players[i].position+PADDLE_LEN_D2,
+                              gameStatePrev.players[i].position+PADDLE_LEN_D2,
+                              HORIZ_CENTER_MAX_PL+PADDLE_WID_D2,
+                              HORIZ_CENTER_MAX_PL-PADDLE_WID_D2,
+                              PLAYER_BLUE);
+          }
+        }else{
+          if(i == 0){
+            LCD_DrawRectangle(gameStatePrev.players[i].position-PADDLE_LEN_D2,
+                              gameStatePrev.players[i].position+PADDLE_LEN_D2,
+                              HORIZ_CENTER_MAX_PL+PADDLE_WID_D2,
+                              HORIZ_CENTER_MAX_PL-PADDLE_WID_D2,
+                              BACK_COLOR);
+            LCD_DrawRectangle(gameState.players[i].position-PADDLE_LEN_D2,
+                              gameState.players[i].position+PADDLE_LEN_D2,
+                              HORIZ_CENTER_MAX_PL+PADDLE_WID_D2,
+                              HORIZ_CENTER_MAX_PL-PADDLE_WID_D2,
+                              PLAYER_RED);
+          }else{
+            LCD_DrawRectangle(gameStatePrev.players[i].position-PADDLE_LEN_D2,
+                              gameStatePrev.players[i].position+PADDLE_LEN_D2,
+                              HORIZ_CENTER_MIN_PL+PADDLE_WID_D2,
+                              HORIZ_CENTER_MIN_PL-PADDLE_WID_D2,
+                              BACK_COLOR);
+            LCD_DrawRectangle(gameState.players[i].position-PADDLE_LEN_D2,
+                              gameState.players[i].position+PADDLE_LEN_D2,
+                              HORIZ_CENTER_MAX_PL+PADDLE_WID_D2,
+                              HORIZ_CENTER_MAX_PL-PADDLE_WID_D2,
+                              PLAYER_BLUE);
+          }
+        }
         gameStatePrev.players[i].position = gameState.players[i].position;
       }
     }
     for(int i = 0; i < MAX_NUM_OF_BALLS; i++){
       if(gameState.balls[i].alive){
-        if(gameStatePrev.balls[i].currentCenterX != gameState.balls[i].currentCenterX){
-          
-          gameStatePrev.balls[i].currentCenterX = gameState.balls[i].currentCenterX;
-        }
-        if(gameStatePrev.balls[i].currentCenterY != gameState.balls[i].currentCenterY){
-          
+        if(gameStatePrev.balls[i].currentCenterX != gameState.balls[i].currentCenterX ||
+           gameStatePrev.balls[i].currentCenterY != gameState.balls[i].currentCenterY){
+        
+          G8RTOS_WaitSemaphore(&lcd);
+          LCD_DrawRectangle(gameStatePrev.balls[i].currentCenterX-BALL_SIZE_D2,
+                            gameStatePrev.balls[i].currentCenterX+BALL_SIZE_D2,
+                            gameStatePrev.balls[i].currentCenterY-BALL_SIZE_D2,
+                            gameStatePrev.balls[i].currentCenterY+BALL_SIZE_D2,
+                            LCD_BLACK);
+          G8RTOS_SignalSemaphore(&lcd);
+
           gameStatePrev.balls[i].currentCenterY = gameState.balls[i].currentCenterY;
+          gameStatePrev.balls[i].currentCenterX = gameState.balls[i].currentCenterX;
+          
+          G8RTOS_WaitSemaphore(&lcd);
+          LCD_DrawRectangle(gameStatePrev.balls[i].currentCenterX-BALL_SIZE_D2,
+                  gameStatePrev.balls[i].currentCenterX+BALL_SIZE_D2,
+                  gameStatePrev.balls[i].currentCenterY-BALL_SIZE_D2,
+                  gameStatePrev.balls[i].currentCenterY+BALL_SIZE_D2,
+                  gameStatePrev.balls[i].color);
+          G8RTOS_SignalSemaphore(&lcd);
         }
       }else if(gameStatePrev.balls[i].alive != gameState.balls[i].alive){
-        
+          G8RTOS_WaitSemaphore(&lcd);
+          LCD_DrawRectangle(gameStatePrev.balls[i].currentCenterX-BALL_SIZE_D2,
+                            gameStatePrev.balls[i].currentCenterX+BALL_SIZE_D2,
+                            gameStatePrev.balls[i].currentCenterY-BALL_SIZE_D2,
+                            gameStatePrev.balls[i].currentCenterY+BALL_SIZE_D2,
+                            LCD_BLACK);
+          G8RTOS_SignalSemaphore(&lcd);
         gameStatePrev.balls[i].alive = gameState.balls[i].alive;
       }
     }
+    
     sleep(20);
   }
 }
