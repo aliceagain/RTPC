@@ -2,7 +2,6 @@
 
 /*********************************************** Global Vars *********************************************************************/
 GameState_t gameState;
-semaphore_t lcd;
 semaphore_t cc3100;
 
 /*********************************************** Client Threads *********************************************************************/
@@ -10,6 +9,7 @@ semaphore_t cc3100;
  * Thread for client to join game
  */
 void JoinGame(){
+  G8RTOS_InitSemaphore(&cc3100, 1);
   initCC3100(Client);
 
   //init specific player info for client
@@ -20,10 +20,30 @@ void JoinGame(){
   gameState.player.joined = false;
   gameState.player.acknowledge = false;
 
+  G8RTOS_WaitSemaphore(&cc3100);
   SendData((uint8_t *)&gameState.player, HOST_IP_ADDR, sizeof(SpecificPlayerInfo_t));
+  G8RTOS_SignalSemaphore(&cc3100);
 
+  G8RTOS_WaitSemaphore(&cc3100);
   while(ReceiveData((uint8_t *)&gameState.player, sizeof(SpecificPlayerInfo_t)) == NOTHING_RECEIVED);
+  G8RTOS_SignalSemaphore(&cc3100);
 
+  P1->DIR |= BIT0;  //p1.0 set to output
+  BITBAND_PERI(P1->OUT, 0) ^= 1;  //toggle led on
+  
+  LCD_Init(false);
+  LCD_DrawRectangle(ARENA_MIN_X, ARENA_MAX_X, ARENA_MIN_X, ARENA_MAX_Y,LCD_BLACK);
+
+  //change priorities later
+  // G8RTOS_AddThread(ReadJoystickClient, 4, NULL);
+  // G8RTOS_AddThread(SendDataToHost, 8, NULL);
+  // G8RTOS_AddThread(ReceiveDataFromHost, 6, NULL);
+  // G8RTOS_AddThread(DrawObjects, 5, NULL);
+  // G8RTOS_AddThread(MoveLEDs, 250, NULL);
+  // G8RTOS_AddThread(Idle, 255, NULL);
+  
+  // G8RTOS_KillSelf();
+  
   while(1);
 }
 
@@ -45,7 +65,9 @@ void SendDataToHost(){
  * Thread to read client's joystick
  */
 void ReadJoystickClient(){
+  while(1){
 
+  }
 }
 
 /*
@@ -63,7 +85,6 @@ void EndOfGameClient(){
  */
 void CreateGame(){
   G8RTOS_AddThread(IdleThread,255,NULL);
-  G8RTOS_InitSemaphore(&lcd, 1);
   G8RTOS_InitSemaphore(&cc3100, 1);
 
   gameState.players[Host]= (GeneralPlayerInfo_t){PADDLE_X_CENTER, PLAYER_RED, BOTTOM};
@@ -77,6 +98,12 @@ void CreateGame(){
   gameState.player.acknowledge = true;
   SendData((uint8_t * ) &gameState.player, gameState.player.IP_address, sizeof(gameState.player));
   G8RTOS_SignalSemaphore(&cc3100);
+
+  P1->DIR |= BIT0;  //p1.0 set to output
+  BITBAND_PERI(P1->OUT, 0) ^= 1;  //toggle led on
+
+  LCD_Init(false);
+  LCD_DrawRectangle(ARENA_MIN_X, ARENA_MAX_X, ARENA_MIN_X, ARENA_MAX_Y,LCD_BLACK);
   while(1);
 }
 
@@ -130,14 +157,38 @@ void EndOfGameHost(){
  * Idle thread
  */
 void IdleThread(){
-
+  while(1);
 }
 
 /*
  * Thread to draw all the objects in the game
  */
 void DrawObjects(){
+  GameState_t gameStatePrev = gameState;
+  while(1){
+    for(int i = 0; i < MAX_NUM_OF_PLAYERS; i++){
+      if(gameStatePrev.players[i].position != gameState.players[i].position){
 
+        gameStatePrev.players[i].position = gameState.players[i].position;
+      }
+    }
+    for(int i = 0; i < MAX_NUM_OF_BALLS; i++){
+      if(gameState.balls[i].alive){
+        if(gameStatePrev.balls[i].currentCenterX != gameState.balls[i].currentCenterX){
+          
+          gameStatePrev.balls[i].currentCenterX = gameState.balls[i].currentCenterX;
+        }
+        if(gameStatePrev.balls[i].currentCenterY != gameState.balls[i].currentCenterY){
+          
+          gameStatePrev.balls[i].currentCenterY != gameState.balls[i].currentCenterY;
+        }
+      }else if(gameStatePrev.balls[i].alive != gameState.balls[i].alive){
+        
+        gameStatePrev.balls[i].alive = gameState.balls[i].alive;
+      }
+    }
+    sleep(20);
+  }
 }
 
 /*
