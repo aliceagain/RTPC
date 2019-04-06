@@ -260,6 +260,10 @@ void DrawObjects();
  */
 void MoveLEDs();
 
+/*
+ * Thread to wait for host/client selection
+ */
+void WaitInit();
 /*********************************************** Common Threads *********************************************************************/
 
 
