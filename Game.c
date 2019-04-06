@@ -12,6 +12,9 @@ void JoinGame(){
   G8RTOS_InitSemaphore(&cc3100, 1);
   initCC3100(Client);
 
+  G8RTOS_InitSemaphore(&lcd, 1);
+  G8RTOS_InitSemaphore(&cc3100, 1);
+
   //init specific player info for client
   gameState.player.IP_address = getLocalIP();
   gameState.player.displacement = 0;
