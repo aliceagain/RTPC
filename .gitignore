@@ -40,3 +40,6 @@ RemoteSystemsTempFiles
 *.zip
 *.pdf#
 
+.vscode
+.launches
+.settings

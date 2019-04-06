@@ -40,6 +40,11 @@
 								</option>
 								<option IS_BUILTIN_EMPTY="false" IS_VALUE_EMPTY="false" id="com.ti.ccstudio.buildDefinitions.MSP432_18.1.compilerID.INCLUDE_PATH.1837878923" name="Add dir to #include search path (--include_path, -I)" superClass="com.ti.ccstudio.buildDefinitions.MSP432_18.1.compilerID.INCLUDE_PATH" valueType="includePath">
 									<listOptionValue builtIn="false" value="${CCS_BASE_ROOT}/arm/include"/>
+									<listOptionValue builtIn="false" value="${PROJECT_LOC}/CC3100SupportPackage/SL_Common"/>
+									<listOptionValue builtIn="false" value="${PROJECT_LOC}/CC3100SupportPackage/board"/>
+									<listOptionValue builtIn="false" value="${PROJECT_LOC}/CC3100SupportPackage/cc3100_usage"/>
+									<listOptionValue builtIn="false" value="${PROJECT_LOC}/CC3100SupportPackage/simplelink/include"/>
+									<listOptionValue builtIn="false" value="${PROJECT_LOC}/CC3100SupportPackage/spi_cc3100"/>
 									<listOptionValue builtIn="false" value="${PROJECT_LOC}/G8RTOS"/>
 									<listOptionValue builtIn="false" value="${PROJECT_LOC}/BoardSupportPackage/DriverLib"/>
 									<listOptionValue builtIn="false" value="${PROJECT_LOC}/BoardSupportPackage/inc"/>
@@ -89,7 +94,7 @@
 						</toolChain>
 					</folderInfo>
 					<sourceEntries>
-						<entry excluding="CC3100SupportPackage" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name=""/>
+						<entry flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name=""/>
 					</sourceEntries>
 				</configuration>
 			</storageModule>
