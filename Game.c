@@ -149,14 +149,36 @@ void SendDataToClient(){
  * Thread that receives UDP packets from client
  */
 void ReceiveDataFromClient(){
-
+  while(1){
+    int16_t tempDisplacement;
+    G8RTOS_WaitSemaphore(&cc3100);
+    while(ReceiveData((uint8_t * )&tempDisplacement, sizeof(int16_t)) == NOTHING_RECEIVED){
+      G8RTOS_SignalSemaphore(&lcd);
+      sleep(1);
+      G8RTOS_WaitSemaphore(&cc3100);
+    }
+    G8RTOS_SignalSemaphore(&lcd);
+    gameState.players[Client].currentCenter += tempDisplacement;
+    if(gameState.players[Client].currentCenter > HORIZ_CENTER_MAX_PL){
+      gameState.players[Client].currentCenter = HORIZ_CENTER_MAX_PL
+    }else if(gameState.players[Client].currentCenter < HORIZ_CENTER_MIN_PL){
+      gameState.players[Client].currentCenter = HORIZ_CENTER_MIN_PL
+    }
+    sleep(2);
+  }
 }
 
 /*
  * Generate Ball thread
  */
 void GenerateBall(){
-
+  while(1){
+    if(gameState.numberOfBalls < MAX_NUM_OF_BALLS){
+      G8RTOS_AddThread(MoveBall,0,NULL);
+      numberOfBalls++;
+    }
+    sleep(100*gameState.numberOfBalls);
+  }
 }
 
 /*
@@ -164,11 +186,11 @@ void GenerateBall(){
  */
 void ReadJoystickHost(){
   int16_t xcoord, ycoord; //ycoord not needed
-  G8RTOS_InitFIFO(JOYSTICK_HOSTFIFO); 
   while(1){
     GetJoystickCoordinates(&xcoord, &ycoord);   //read x coord;
-    writeFIFO(JOYSTICK_HOSTFIFO,xcoord);
+    //TODO: Turn ADC value into something realistic for movement.
     sleep(10);
+    gameState.players[Host].currentCenter += xcoord;
   }  
 }
 
@@ -176,7 +198,24 @@ void ReadJoystickHost(){
  * Thread to move a single ball
  */
 void MoveBall(){
-
+  Ball_t * ball = null;
+  for(int i = 0; i < MAX_NUM_OF_BALLS; i++){
+      if(!gameState.balls[i].alive){
+        ball = i;
+      }
+  }
+  if(!ball){
+    G8RTOS_KillSelf();
+  }
+  ball->currentCenterX = (SystemTime-&ball>>2+gameState.players[Client].currentCenter)%HORIZ_CENTER_MAX_BALL + HORIZ_CENTER_MIN_BALL;
+  ball->currentCenterY = (SystemTime-&ball>>2+gameState.players[Host].currentCenter)%VERT_CENTER_MAX_BALL + VERT_CENTER_MIN_BALL;
+  ball->currentVelocityX = (SystemTime-&ball>>2+gameState.players[Host].currentCenter)%MAX_BALL_SPEED;
+  ball->currentVelocityY = (SystemTime-&ball>>2+gameState.players[Client].currentCenter)%MAX_BALL_SPEED;
+  ball->color = ballColor[SystemTime>>3%8];
+  ball->alive = true;
+  while(1){
+    //TODO: MOVE BALLS
+  }
 }
 
 /*

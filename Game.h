@@ -21,6 +21,8 @@
 /* Semaphores here */ 
 semaphore_t cc3100;
 semaphore_t lcd;
+
+uint16_t ballColor[8] = {0xF81F,0x07E0,0x7FFF,0xFFE0,0xF11F,0xFD20,0xfdba,0xdfe4};
 /*********************************************** Externs ********************************************************************/
 
 /*********************************************** Global Defines ********************************************************************/
@@ -142,6 +144,8 @@ typedef struct
 {
     int16_t currentCenterX;
     int16_t currentCenterY;
+    int16_t currentVelocityX;
+    int16_t currentVelocityY;
     uint16_t color;
     bool alive;
 } Ball_t;
