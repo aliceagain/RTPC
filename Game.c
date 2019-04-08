@@ -221,7 +221,33 @@ void MoveBall(){
   ball->color = ballColors[SystemTime>>3%8];
   ball->alive = true;
   while(1){
-    //TODO: MOVE BALLS
+    ball->currentCenterX += ball->currentVelocityX;
+    ball->currentCenterY += ball->currentVelocityY;
+    if(ball->currentCenterX > HORIZ_CENTER_MAX_BALL){
+      ball->currentVelocityX *= -1;
+      ball->currentCenterX = HORIZ_CENTER_MAX_BALL;
+    }
+    if(ball->currentCenterX < HORIZ_CENTER_MIN_BALL){
+      ball->currentVelocityX *= -1;
+      ball->currentCenterX = HORIZ_CENTER_MIN_BALL;
+    }
+    if(ball->currentCenterY > VERT_CENTER_MAX_BALL){
+      gameState.LEDScores[CLIENT] |= 0x10<<gameState.overallScores[CLIENT]++;
+      if(gameState.overallScores[CLIENT] == 4){
+        gameState.winner = CLIENT;
+        gameState.gameDone = true;
+      }
+      G8RTOS_KillSelf();
+    }
+    if(ball->currentCenterY < VERT_CENTER_MIN_BALL){
+      gameState.LEDScores[HOST] |= 0xF>>gameState.overallScores[HOST]++;
+      if(gameState.overallScores[HOST] == 4){
+        gameState.winner = HOST;
+        gameState.gameDone = true;
+      }
+      G8RTOS_KillSelf();
+    }
+    //TODO: Collision checks
   }
 }
 
