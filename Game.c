@@ -218,11 +218,31 @@ void MoveBall(){
   }
 }
 
+bool restart = false;
+void EndofGameButtonHandler(){
+  restart = true;
+  P4->IFG &= ~BIT4;  
+}
+
 /*
  * End of game for the host
  */
+char endOfGameText[] = "Press Host Button on Host to Restart Game.";
 void EndOfGameHost(){
-
+    G8RTOS_WaitSemaphore(&cc3100);
+    G8RTOS_WaitSemaphore(&lcd);
+    G8RTOS_KillOthers();
+    G8RTOS_InitSemaphore(&cc3100, 1);
+    G8RTOS_InitSemaphore(&lcd, 1);
+    
+    G8RTOS_WaitSemaphore(&lcd);
+    LCD_Clear(gameState.winner == HOST ? gameState.players[HOST].color : gameState.players[CLIENT].color);
+    LCD_Text(20,100,endOfGameText,LCD_BLACK);
+    P4->IE |= BIT4;
+    G8RTOS_AddAPeriodicEvent(EndofGameButtonHandler,6,PORT4_IRQn);
+    while(!restart);
+    //Send data to client
+    
 }
 
 /*********************************************** Host Threads *********************************************************************/

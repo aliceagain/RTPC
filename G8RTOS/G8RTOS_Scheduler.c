@@ -335,6 +335,14 @@ sched_ErrCode_t G8RTOS_KillSelf(){
     return G8RTOS_KillThread(CurrentlyRunningThread->threadID);
 }
 
+void G8RTOS_KillOthers(){
+    for(int i = 0; i < MAX_THREADS; i++){
+        if(threadControlBlocks[i].isAlive && threadControlBlocks[i].threadID != CurrentlyRunningThread->threadID){
+            G8RTOS_KillThread(threadControlBlocks[i].threadID);
+        }
+    }
+}
+
 sched_ErrCode_t G8RTOS_AddAPeriodicEvent(void (*AthreadToAdd) (void), uint8_t priority, IRQn_Type IRQn){
     if( IRQn < PSS_IRQn || IRQn > PORT6_IRQn){
         return IRQn_INVALID;

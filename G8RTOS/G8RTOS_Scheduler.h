@@ -97,6 +97,8 @@ sched_ErrCode_t G8RTOS_AddAPeriodicEvent(void (*AthreadToAdd) (void), uint8_t pr
 
 struct tcb_t* G8RTOS_GetThread(threadId_t id);
 
+void G8RTOS_KillOthers();
+
 /*********************************************** Public Functions *********************************************************************/
 
 #endif /* G8RTOS_SCHEDULER_H_ */
