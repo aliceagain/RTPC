@@ -1,7 +1,9 @@
 #include "Game.h"
+#include "BSP.h"
 
 /*********************************************** Global Vars *********************************************************************/
 GameState_t gameState;
+uint16_t ballColors[8] = {0xF81F,0x07E0,0x7FFF,0xFFE0,0xF11F,0xFD20,0xfdba,0xdfe4};
 
 /*********************************************** Client Threads *********************************************************************/
 /*
@@ -20,7 +22,7 @@ void JoinGame(){
   //init specific player info for client
   gameState.player.IP_address = getLocalIP();
   gameState.player.displacement = xcoord;
-  gameState.player.playerNumber = Client;  //0 = client, 1 = host
+  gameState.player.playerNumber = CLIENT;  //0 = client, 1 = host
   gameState.player.ready = true;
   gameState.player.joined = false;
   gameState.player.acknowledge = false;
@@ -48,7 +50,7 @@ void JoinGame(){
   G8RTOS_AddThread(ReceiveDataFromHost, 6, NULL);
   G8RTOS_AddThread(DrawObjects, 5, NULL);
   G8RTOS_AddThread(MoveLEDs, 250, NULL);
-  G8RTOS_AddThread(Idle, 255, NULL);
+  G8RTOS_AddThread(IdleThread, 255, NULL);
   
   G8RTOS_KillSelf();
   
@@ -74,8 +76,7 @@ void SendDataToHost(){
  */
 void ReadJoystickClient(){
   int16_t xcoord, ycoord; //ycoord not needed
-  G8RTOS_InitFIFO(JOYSTICK_CLIENTFIFO);
-  int16_t  
+//  int16_t
   while(1){
     GetJoystickCoordinates(&xcoord, &ycoord);   //read x coord;
     
@@ -103,8 +104,8 @@ void CreateGame(){
   G8RTOS_InitSemaphore(&cc3100, 1);
   G8RTOS_InitSemaphore(&lcd, 1);
 
-  gameState.players[Host]= (GeneralPlayerInfo_t){PADDLE_X_CENTER, PLAYER_RED, BOTTOM};
-  gameState.players[Client]= (GeneralPlayerInfo_t){PADDLE_X_CENTER, PLAYER_BLUE, TOP};
+  gameState.players[HOST]= (GeneralPlayerInfo_t){PADDLE_X_CENTER, PLAYER_RED, BOTTOM};
+  gameState.players[CLIENT]= (GeneralPlayerInfo_t){PADDLE_X_CENTER, PLAYER_BLUE, TOP};
 
   G8RTOS_WaitSemaphore(&cc3100);
   initCC3100(Host);
@@ -130,8 +131,8 @@ void CreateGame(){
   G8RTOS_AddThread(ReadJoystickHost, 0, NULL);
   G8RTOS_AddThread(SendDataToClient, 0, NULL);
   G8RTOS_AddThread(ReceiveDataFromClient, 0, NULL);
-  G8RTOS_AddThread(MoveLEDs, 0, NULL)
-  G8RTOS_AddThread(Idle, 255, NULL);
+  G8RTOS_AddThread(MoveLEDs, 0, NULL);
+  G8RTOS_AddThread(IdleThread, 255, NULL);
 
   G8RTOS_KillSelf();
 
@@ -143,7 +144,7 @@ void CreateGame(){
  */
 void SendDataToClient(){
   while(1){
-    SendData((uint8_t * ) gameState, gameState.player.IP_address, sizeof(gameState));
+    SendData((uint8_t * ) &gameState, gameState.player.IP_address, sizeof(gameState));
     if(gameState.gameDone){
       G8RTOS_AddThread(EndOfGameHost, 0, NULL);
     }
@@ -164,11 +165,11 @@ void ReceiveDataFromClient(){
       G8RTOS_WaitSemaphore(&cc3100);
     }
     G8RTOS_SignalSemaphore(&lcd);
-    gameState.players[Client].currentCenter += tempDisplacement;
-    if(gameState.players[Client].currentCenter > HORIZ_CENTER_MAX_PL){
-      gameState.players[Client].currentCenter = HORIZ_CENTER_MAX_PL
-    }else if(gameState.players[Client].currentCenter < HORIZ_CENTER_MIN_PL){
-      gameState.players[Client].currentCenter = HORIZ_CENTER_MIN_PL
+    gameState.players[CLIENT].currentCenter += tempDisplacement;
+    if(gameState.players[CLIENT].currentCenter > HORIZ_CENTER_MAX_PL){
+      gameState.players[CLIENT].currentCenter = HORIZ_CENTER_MAX_PL;
+    }else if(gameState.players[CLIENT].currentCenter < HORIZ_CENTER_MIN_PL){
+      gameState.players[CLIENT].currentCenter = HORIZ_CENTER_MIN_PL;
     }
     sleep(2);
   }
@@ -181,7 +182,7 @@ void GenerateBall(){
   while(1){
     if(gameState.numberOfBalls < MAX_NUM_OF_BALLS){
       G8RTOS_AddThread(MoveBall,0,NULL);
-      numberOfBalls++;
+      gameState.numberOfBalls++;
     }
     sleep(100*gameState.numberOfBalls);
   }
@@ -196,7 +197,7 @@ void ReadJoystickHost(){
     GetJoystickCoordinates(&xcoord, &ycoord);   //read x coord;
     //TODO: Turn ADC value into something realistic for movement.
     sleep(10);
-    gameState.players[Host].currentCenter += xcoord;
+    gameState.players[HOST].currentCenter += xcoord;
   }  
 }
 
@@ -204,20 +205,20 @@ void ReadJoystickHost(){
  * Thread to move a single ball
  */
 void MoveBall(){
-  Ball_t * ball = null;
+  Ball_t * ball = NULL;
   for(int i = 0; i < MAX_NUM_OF_BALLS; i++){
       if(!gameState.balls[i].alive){
-        ball = i;
+        ball = &gameState.balls[i];
       }
   }
   if(!ball){
     G8RTOS_KillSelf();
   }
-  ball->currentCenterX = (SystemTime-&ball>>2+gameState.players[Client].currentCenter)%HORIZ_CENTER_MAX_BALL + HORIZ_CENTER_MIN_BALL;
-  ball->currentCenterY = (SystemTime-&ball>>2+gameState.players[Host].currentCenter)%VERT_CENTER_MAX_BALL + VERT_CENTER_MIN_BALL;
-  ball->currentVelocityX = (SystemTime-&ball>>2+gameState.players[Host].currentCenter)%MAX_BALL_SPEED;
-  ball->currentVelocityY = (SystemTime-&ball>>2+gameState.players[Client].currentCenter)%MAX_BALL_SPEED;
-  ball->color = ballColor[SystemTime>>3%8];
+  ball->currentCenterX = (SystemTime-(int32_t)&ball>>2+gameState.players[CLIENT].currentCenter)%HORIZ_CENTER_MAX_BALL + HORIZ_CENTER_MIN_BALL;
+  ball->currentCenterY = (SystemTime-(int32_t)&ball>>2+gameState.players[HOST].currentCenter)%VERT_CENTER_MAX_BALL + VERT_CENTER_MIN_BALL;
+  ball->currentVelocityX = (SystemTime-(int32_t)&ball>>2+gameState.players[HOST].currentCenter)%MAX_BALL_SPEED;
+  ball->currentVelocityY = (SystemTime-(int32_t)&ball>>2+gameState.players[CLIENT].currentCenter)%MAX_BALL_SPEED;
+  ball->color = ballColors[SystemTime>>3%8];
   ball->alive = true;
   while(1){
     //TODO: MOVE BALLS
@@ -243,14 +244,14 @@ void EndOfGameHost(){
     
     G8RTOS_WaitSemaphore(&lcd);
     LCD_Clear(gameState.winner == HOST ? gameState.players[HOST].color : gameState.players[CLIENT].color);
-    LCD_Text(20,100,endOfGameText,LCD_BLACK);
+    LCD_Text(20,100,(uint8_t*)endOfGameText,LCD_BLACK);
     P4->IE |= BIT4;
     G8RTOS_AddAPeriodicEvent(EndofGameButtonHandler,6,PORT4_IRQn);
     while(!restart);
     SendData((uint8_t * ) &restart, gameState.player.IP_address, sizeof(sizeof(bool)));
     restart = false;
-    gameState.players[HOST].position = PADDLE_X_CENTER;
-    gameState.players[CLIENT].position = PADDLE_X_CENTER;
+    gameState.players[HOST].currentCenter = PADDLE_X_CENTER;
+    gameState.players[CLIENT].currentCenter = PADDLE_X_CENTER;
     gameState.winner = 0;
     gameState.gameDone = false;
     for(int i = 0; i < MAX_NUM_OF_BALLS; i++){
@@ -274,8 +275,8 @@ void EndOfGameHost(){
     G8RTOS_AddThread(ReadJoystickHost, 0, NULL);
     G8RTOS_AddThread(SendDataToClient, 0, NULL);
     G8RTOS_AddThread(ReceiveDataFromClient, 0, NULL);
-    G8RTOS_AddThread(MoveLEDs, 0, NULL)
-    G8RTOS_AddThread(Idle, 255, NULL);
+    G8RTOS_AddThread(MoveLEDs, 0, NULL);
+    G8RTOS_AddThread(IdleThread, 255, NULL);
 
     G8RTOS_KillSelf();
 }

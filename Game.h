@@ -22,7 +22,6 @@
 semaphore_t cc3100;
 semaphore_t lcd;
 
-uint16_t ballColor[8] = {0xF81F,0x07E0,0x7FFF,0xFFE0,0xF11F,0xFD20,0xfdba,0xdfe4};
 /*********************************************** Externs ********************************************************************/
 
 /*********************************************** Global Defines ********************************************************************/
@@ -89,6 +88,9 @@ uint16_t ballColor[8] = {0xF81F,0x07E0,0x7FFF,0xFFE0,0xF11F,0xFD20,0xfdba,0xdfe4
 /* Used as status LEDs for Wi-Fi */
 #define BLUE_LED BIT2
 #define RED_LED BIT0
+
+#define CLIENT 0
+#define HOST 1
 
 /* Used for different FIFO names */
 #define JOYSTICK_CLIENTFIFO CLIENT
@@ -182,6 +184,8 @@ typedef struct
 {
     int16_t Center;
 }PrevPlayer_t;
+
+
 /*********************************************** Data Structures ********************************************************************/
 
 
