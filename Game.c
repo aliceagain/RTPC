@@ -241,8 +241,37 @@ void EndOfGameHost(){
     P4->IE |= BIT4;
     G8RTOS_AddAPeriodicEvent(EndofGameButtonHandler,6,PORT4_IRQn);
     while(!restart);
-    //Send data to client
-    
+    SendData((uint8_t * ) &restart, gameState.player.IP_address, sizeof(sizeof(bool)));
+    restart = false;
+    gameState.players[HOST].position = PADDLE_X_CENTER;
+    gameState.players[CLIENT].position = PADDLE_X_CENTER;
+    gameState.winner = 0;
+    gameState.gameDone = false;
+    for(int i = 0; i < MAX_NUM_OF_BALLS; i++){
+      gameState.balls[i].alive = false;
+    }
+    gameState.numberOfBalls = 0;
+    for(int i = 0; i < MAX_NUM_OF_PLAYERS; i++){
+      gameState.LEDScores[i] = 0;
+      gameState.overallScores[i] = 0;
+    }
+
+      G8RTOS_WaitSemaphore(&lcd);
+    LCD_Init(false);
+    LCD_Clear(LCD_GRAY);
+    LCD_DrawRectangle(ARENA_MIN_X, ARENA_MAX_X, ARENA_MIN_X, ARENA_MAX_Y,LCD_BLACK);
+    G8RTOS_SignalSemaphore(&lcd);
+
+    //change priorities later
+    G8RTOS_AddThread(GenerateBall, 0, NULL);
+    G8RTOS_AddThread(DrawObjects, 0, NULL);
+    G8RTOS_AddThread(ReadJoystickHost, 0, NULL);
+    G8RTOS_AddThread(SendDataToClient, 0, NULL);
+    G8RTOS_AddThread(ReceiveDataFromClient, 0, NULL);
+    G8RTOS_AddThread(MoveLEDs, 0, NULL)
+    G8RTOS_AddThread(Idle, 255, NULL);
+
+    G8RTOS_KillSelf();
 }
 
 /*********************************************** Host Threads *********************************************************************/
