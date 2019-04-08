@@ -142,7 +142,13 @@ void CreateGame(){
  * Thread that sends game state to client
  */
 void SendDataToClient(){
-
+  while(1){
+    SendData((uint8_t * ) gameState, gameState.player.IP_address, sizeof(gameState));
+    if(gameState.gameDone){
+      G8RTOS_AddThread(EndOfGameHost, 0, NULL);
+    }
+    sleep(5);
+  }
 }
 
 /*
