@@ -119,11 +119,7 @@ void CreateGame(){
   P2->DIR |= RED_LED;  //p1.0 set to output
   BITBAND_PERI(P2->OUT, 0) = 1;  //toggle led on
 
-  G8RTOS_WaitSemaphore(&lcd);
-  LCD_Init(false);
-  LCD_Clear(LCD_GRAY);
-  LCD_DrawRectangle(ARENA_MIN_X, ARENA_MAX_X, ARENA_MIN_X, ARENA_MAX_Y,LCD_BLACK);
-  G8RTOS_SignalSemaphore(&lcd);
+  InitBoardState();
 
   //change priorities later
   G8RTOS_AddThread(GenerateBall, 0, NULL);
@@ -237,6 +233,13 @@ void MoveBall(){
         gameState.winner = CLIENT;
         gameState.gameDone = true;
       }
+      G8RTOS_WaitSemaphore(&lcd);
+      LCD_DrawRectangle(ball->currentCenterX-BALL_SIZE_D2,
+                        ball->currentCenterX+BALL_SIZE_D2,
+                        ball->currentCenterY-BALL_SIZE_D2,
+                        ball->currentCenterY+BALL_SIZE_D2,
+                        LCD_BLACK);
+      G8RTOS_SignalSemaphore(&lcd);
       G8RTOS_KillSelf();
     }
     if(ball->currentCenterY < VERT_CENTER_MIN_BALL){
@@ -245,6 +248,13 @@ void MoveBall(){
         gameState.winner = HOST;
         gameState.gameDone = true;
       }
+      G8RTOS_WaitSemaphore(&lcd);
+      LCD_DrawRectangle(ball->currentCenterX-BALL_SIZE_D2,
+                        ball->currentCenterX+BALL_SIZE_D2,
+                        ball->currentCenterY-BALL_SIZE_D2,
+                        ball->currentCenterY+BALL_SIZE_D2,
+                        LCD_BLACK);
+      G8RTOS_SignalSemaphore(&lcd);
       G8RTOS_KillSelf();
     }
     //TODO: Collision checks
@@ -276,24 +286,8 @@ void EndOfGameHost(){
     while(!restart);
     SendData((uint8_t * ) &restart, gameState.player.IP_address, sizeof(sizeof(bool)));
     restart = false;
-    gameState.players[HOST].currentCenter = PADDLE_X_CENTER;
-    gameState.players[CLIENT].currentCenter = PADDLE_X_CENTER;
-    gameState.winner = 0;
-    gameState.gameDone = false;
-    for(int i = 0; i < MAX_NUM_OF_BALLS; i++){
-      gameState.balls[i].alive = false;
-    }
-    gameState.numberOfBalls = 0;
-    for(int i = 0; i < MAX_NUM_OF_PLAYERS; i++){
-      gameState.LEDScores[i] = 0;
-      gameState.overallScores[i] = 0;
-    }
 
-      G8RTOS_WaitSemaphore(&lcd);
-    LCD_Init(false);
-    LCD_Clear(LCD_GRAY);
-    LCD_DrawRectangle(ARENA_MIN_X, ARENA_MAX_X, ARENA_MIN_X, ARENA_MAX_Y,LCD_BLACK);
-    G8RTOS_SignalSemaphore(&lcd);
+    InitBoardState();
 
     //change priorities later
     G8RTOS_AddThread(GenerateBall, 0, NULL);
@@ -322,123 +316,17 @@ void IdleThread(){
  * Thread to draw all the objects in the game
  */
 void DrawObjects(){
-  GameState_t gameStatePrev;
+  PrevPlayer_t prevPlayers[MAX_NUM_OF_PLAYERS];
+  PrevBall_t prevBalls[MAX_NUM_OF_BALLS];
   while(1){
     for(int i = 0; i < MAX_NUM_OF_PLAYERS; i++){
-      if(gameStatePrev.players[i].position != gameState.players[i].position){
-        int16_t posDiff = gameState.players[i].position - gameStatePrev.players[i].position;
-        if(posDiff > 0 && posDiff < PADDLE_LEN_D2 ){
-          if(i == 0){
-            LCD_DrawRectangle(gameState.players[i].position+PADDLE_LEN_D2,
-                              gameStatePrev.players[i].position+PADDLE_LEN_D2,
-                              HORIZ_CENTER_MAX_PL+PADDLE_WID_D2,
-                              HORIZ_CENTER_MAX_PL-PADDLE_WID_D2,
-                              BACK_COLOR);
-            LCD_DrawRectangle(gameState.players[i].position-PADDLE_LEN_D2,
-                              gameStatePrev.players[i].position-PADDLE_LEN_D2,
-                              HORIZ_CENTER_MAX_PL+PADDLE_WID_D2,
-                              HORIZ_CENTER_MAX_PL-PADDLE_WID_D2,
-                              PLAYER_RED);
-          }else{
-            LCD_DrawRectangle(gameState.players[i].position+PADDLE_LEN_D2,
-                              gameStatePrev.players[i].position+PADDLE_LEN_D2,
-                              HORIZ_CENTER_MIN_PL+PADDLE_WID_D2,
-                              HORIZ_CENTER_MIN_PL-PADDLE_WID_D2,
-                              BACK_COLOR);
-            LCD_DrawRectangle(gameState.players[i].position-PADDLE_LEN_D2,
-                              gameStatePrev.players[i].position-PADDLE_LEN_D2,
-                              HORIZ_CENTER_MAX_PL+PADDLE_WID_D2,
-                              HORIZ_CENTER_MAX_PL-PADDLE_WID_D2,
-                              PLAYER_BLUE);
-          }
-        }else if(posDiff < 0 && posDiff > -PADDLE_LEN_D2){
-          if(i == 0){
-            LCD_DrawRectangle(gameState.players[i].position-PADDLE_LEN_D2,
-                              gameStatePrev.players[i].position-PADDLE_LEN_D2,
-                              HORIZ_CENTER_MAX_PL+PADDLE_WID_D2,
-                              HORIZ_CENTER_MAX_PL-PADDLE_WID_D2,
-                              BACK_COLOR);
-            LCD_DrawRectangle(gameState.players[i].position+PADDLE_LEN_D2,
-                              gameStatePrev.players[i].position+PADDLE_LEN_D2,
-                              HORIZ_CENTER_MAX_PL+PADDLE_WID_D2,
-                              HORIZ_CENTER_MAX_PL-PADDLE_WID_D2,
-                              PLAYER_RED);
-          }else{
-            LCD_DrawRectangle(gameState.players[i].position-PADDLE_LEN_D2,
-                              gameStatePrev.players[i].position-PADDLE_LEN_D2,
-                              HORIZ_CENTER_MIN_PL+PADDLE_WID_D2,
-                              HORIZ_CENTER_MIN_PL-PADDLE_WID_D2,
-                              BACK_COLOR);
-            LCD_DrawRectangle(gameState.players[i].position+PADDLE_LEN_D2,
-                              gameStatePrev.players[i].position+PADDLE_LEN_D2,
-                              HORIZ_CENTER_MAX_PL+PADDLE_WID_D2,
-                              HORIZ_CENTER_MAX_PL-PADDLE_WID_D2,
-                              PLAYER_BLUE);
-          }
-        }else{
-          if(i == 0){
-            LCD_DrawRectangle(gameStatePrev.players[i].position-PADDLE_LEN_D2,
-                              gameStatePrev.players[i].position+PADDLE_LEN_D2,
-                              HORIZ_CENTER_MAX_PL+PADDLE_WID_D2,
-                              HORIZ_CENTER_MAX_PL-PADDLE_WID_D2,
-                              BACK_COLOR);
-            LCD_DrawRectangle(gameState.players[i].position-PADDLE_LEN_D2,
-                              gameState.players[i].position+PADDLE_LEN_D2,
-                              HORIZ_CENTER_MAX_PL+PADDLE_WID_D2,
-                              HORIZ_CENTER_MAX_PL-PADDLE_WID_D2,
-                              PLAYER_RED);
-          }else{
-            LCD_DrawRectangle(gameStatePrev.players[i].position-PADDLE_LEN_D2,
-                              gameStatePrev.players[i].position+PADDLE_LEN_D2,
-                              HORIZ_CENTER_MIN_PL+PADDLE_WID_D2,
-                              HORIZ_CENTER_MIN_PL-PADDLE_WID_D2,
-                              BACK_COLOR);
-            LCD_DrawRectangle(gameState.players[i].position-PADDLE_LEN_D2,
-                              gameState.players[i].position+PADDLE_LEN_D2,
-                              HORIZ_CENTER_MAX_PL+PADDLE_WID_D2,
-                              HORIZ_CENTER_MAX_PL-PADDLE_WID_D2,
-                              PLAYER_BLUE);
-          }
-        }
-        gameStatePrev.players[i].position = gameState.players[i].position;
+      if(prevPlayers[i].Center != gameState.players[i].currentCenter){
+        UpdatePlayerOnScreen(&prevPlayers[i],&gameState.players[i]);
       }
     }
     for(int i = 0; i < MAX_NUM_OF_BALLS; i++){
-      if(gameState.balls[i].alive){
-        if(gameStatePrev.balls[i].currentCenterX != gameState.balls[i].currentCenterX ||
-           gameStatePrev.balls[i].currentCenterY != gameState.balls[i].currentCenterY){
-        
-          G8RTOS_WaitSemaphore(&lcd);
-          LCD_DrawRectangle(gameStatePrev.balls[i].currentCenterX-BALL_SIZE_D2,
-                            gameStatePrev.balls[i].currentCenterX+BALL_SIZE_D2,
-                            gameStatePrev.balls[i].currentCenterY-BALL_SIZE_D2,
-                            gameStatePrev.balls[i].currentCenterY+BALL_SIZE_D2,
-                            LCD_BLACK);
-          G8RTOS_SignalSemaphore(&lcd);
-
-          gameStatePrev.balls[i].currentCenterY = gameState.balls[i].currentCenterY;
-          gameStatePrev.balls[i].currentCenterX = gameState.balls[i].currentCenterX;
-          
-          G8RTOS_WaitSemaphore(&lcd);
-          LCD_DrawRectangle(gameStatePrev.balls[i].currentCenterX-BALL_SIZE_D2,
-                  gameStatePrev.balls[i].currentCenterX+BALL_SIZE_D2,
-                  gameStatePrev.balls[i].currentCenterY-BALL_SIZE_D2,
-                  gameStatePrev.balls[i].currentCenterY+BALL_SIZE_D2,
-                  gameStatePrev.balls[i].color);
-          G8RTOS_SignalSemaphore(&lcd);
-        }
-      }else if(gameStatePrev.balls[i].alive != gameState.balls[i].alive){
-          G8RTOS_WaitSemaphore(&lcd);
-          LCD_DrawRectangle(gameStatePrev.balls[i].currentCenterX-BALL_SIZE_D2,
-                            gameStatePrev.balls[i].currentCenterX+BALL_SIZE_D2,
-                            gameStatePrev.balls[i].currentCenterY-BALL_SIZE_D2,
-                            gameStatePrev.balls[i].currentCenterY+BALL_SIZE_D2,
-                            LCD_BLACK);
-          G8RTOS_SignalSemaphore(&lcd);
-        gameStatePrev.balls[i].alive = gameState.balls[i].alive;
-      }
+      UpdateBallOnScreen(&prevBalls[i],&gameState.balls[i],gameState.balls[i].color);
     }
-    
     sleep(20);
   }
 }
@@ -447,7 +335,11 @@ void DrawObjects(){
  * Thread to update LEDs based on score
  */
 void MoveLEDs(){
-
+  while(1){
+    LP3943_LedModeSet(RED,gameState.LEDScores[HOST]);
+    LP3943_LedModeSet(BLUE,gameState.LEDScores[CLIENT]);
+    sleep(10);
+  }
 }
 
  bool isHost = false;
@@ -514,28 +406,110 @@ playerType GetPlayerRole(){
  * Draw players given center X center coordinate
  */
 void DrawPlayer(GeneralPlayerInfo_t * player){
-
+  LCD_DrawRectangle(player->position-PADDLE_LEN_D2,
+                  player->position+PADDLE_LEN_D2,
+                  HORIZ_CENTER_MAX_PL+PADDLE_WID_D2,
+                  HORIZ_CENTER_MAX_PL-PADDLE_WID_D2,
+                  player->color);
 }
 
 /*
  * Updates player's paddle based on current and new center
  */
 void UpdatePlayerOnScreen(PrevPlayer_t * prevPlayerIn, GeneralPlayerInfo_t * outPlayer){
-
+  int16_t posDiff = outPlayer->currentCenter - prevPlayerIn->Center;
+  if(posDiff > 0 && posDiff < PADDLE_LEN_D2 ){
+    LCD_DrawRectangle(outPlayer->currentCenter+PADDLE_LEN_D2,
+                      prevPlayerIn->Center+PADDLE_LEN_D2,
+                      HORIZ_CENTER_MAX_PL+PADDLE_WID_D2,
+                      HORIZ_CENTER_MAX_PL-PADDLE_WID_D2,
+                      BACK_COLOR);
+    LCD_DrawRectangle(outPlayer->currentCenter-PADDLE_LEN_D2,
+                      prevPlayerIn->Center-PADDLE_LEN_D2,
+                      HORIZ_CENTER_MAX_PL+PADDLE_WID_D2,
+                      HORIZ_CENTER_MAX_PL-PADDLE_WID_D2,
+                      outPlayer->color);
+  }else if(posDiff < 0 && posDiff > -PADDLE_LEN_D2){
+    LCD_DrawRectangle(outPlayer->currentCenter-PADDLE_LEN_D2,
+                      prevPlayerIn->Center-PADDLE_LEN_D2,
+                      HORIZ_CENTER_MAX_PL+PADDLE_WID_D2,
+                      HORIZ_CENTER_MAX_PL-PADDLE_WID_D2,
+                      BACK_COLOR);
+    LCD_DrawRectangle(outPlayer->currentCenter+PADDLE_LEN_D2,
+                      prevPlayerIn->Center+PADDLE_LEN_D2,
+                      HORIZ_CENTER_MAX_PL+PADDLE_WID_D2,
+                      HORIZ_CENTER_MAX_PL-PADDLE_WID_D2,
+                      outPlayer->color);
+  }else{
+    LCD_DrawRectangle(prevPlayerIn->Center-PADDLE_LEN_D2,
+                      prevPlayerIn->Center+PADDLE_LEN_D2,
+                      HORIZ_CENTER_MAX_PL+PADDLE_WID_D2,
+                      HORIZ_CENTER_MAX_PL-PADDLE_WID_D2,
+                      BACK_COLOR);
+    LCD_DrawRectangle(outPlayer->currentCenter-PADDLE_LEN_D2,
+                      outPlayer->currentCenter+PADDLE_LEN_D2,
+                      HORIZ_CENTER_MAX_PL+PADDLE_WID_D2,
+                      HORIZ_CENTER_MAX_PL-PADDLE_WID_D2,
+                      outPlayer->color);
+  }
+  prevPlayerIn->Center = outPlayer->currentCenter;
 }
 
 /*
  * Function updates ball position on screen
  */
 void UpdateBallOnScreen(PrevBall_t * previousBall, Ball_t * currentBall, uint16_t outColor){
+  if(currentBall->alive){
+    if(previousBall->CenterX != currentBall->currentCenterX ||
+        previousBall->CenterY != currentBall->currentCenterY){
+    
+      G8RTOS_WaitSemaphore(&lcd);
+      LCD_DrawRectangle(previousBall->CenterX-BALL_SIZE_D2,
+                        previousBall->CenterX+BALL_SIZE_D2,
+                        previousBall->CenterY-BALL_SIZE_D2,
+                        previousBall->CenterY+BALL_SIZE_D2,
+                        LCD_BLACK);
+      G8RTOS_SignalSemaphore(&lcd);
 
+      previousBall->CenterY = currentBall->currentCenterY;
+      previousBall->CenterX = currentBall->currentCenterX;
+      
+      G8RTOS_WaitSemaphore(&lcd);
+      LCD_DrawRectangle(previousBall->CenterX-BALL_SIZE_D2,
+              previousBall->CenterX+BALL_SIZE_D2,
+              previousBall->CenterY-BALL_SIZE_D2,
+              previousBall->CenterY+BALL_SIZE_D2,
+              outColor);
+      G8RTOS_SignalSemaphore(&lcd);
+    }
+  }
 }
 
 /*
  * Initializes and prints initial game state
  */
 void InitBoardState(){
+  gameState.players[HOST].currentCenter = PADDLE_X_CENTER;
+  gameState.players[CLIENT].currentCenter = PADDLE_X_CENTER;
+  gameState.winner = 0;
+  gameState.gameDone = false;
+  for(int i = 0; i < MAX_NUM_OF_BALLS; i++){
+    gameState.balls[i].alive = false;
+  }
+  gameState.numberOfBalls = 0;
+  for(int i = 0; i < MAX_NUM_OF_PLAYERS; i++){
+    gameState.LEDScores[i] = 0;
+    gameState.overallScores[i] = 0;
+  }
 
+  G8RTOS_WaitSemaphore(&lcd);
+  LCD_Init(false);
+  LCD_Clear(LCD_GRAY);
+  LCD_DrawRectangle(ARENA_MIN_X, ARENA_MAX_X, ARENA_MIN_X, ARENA_MAX_Y,LCD_BLACK);
+  G8RTOS_SignalSemaphore(&lcd);
+
+  DrawPlayer(&gameState.players[HOST]);
+  DrawPlayer(&gameState.players[CLIENT]);
 }
 
 /*********************************************** Public Functions *********************************************************************/
