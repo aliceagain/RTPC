@@ -25,6 +25,8 @@ semaphore_t lcd;
 /*********************************************** Externs ********************************************************************/
 
 /*********************************************** Global Defines ********************************************************************/
+#define abs(x) x < 0 ? -x : x
+
 #define MAX_NUM_OF_PLAYERS  2
 #define MAX_NUM_OF_BALLS    8
 
@@ -110,6 +112,15 @@ typedef enum
     TOP = 1
 }playerPosition;
 
+typedef enum
+{
+    CNONE = -1,
+    CTOP = 0,
+    CBOTTOM = 1,
+    CRIGHT = 2,
+    CLEFT = 3
+}collisionPosition;
+
 /*********************************************** Global Defines ********************************************************************/
 
 /*********************************************** Data Structures ********************************************************************/
@@ -185,6 +196,12 @@ typedef struct
     int16_t Center;
 }PrevPlayer_t;
 
+typedef struct{
+    int16_t width;
+    int16_t height;
+    int16_t centerX;
+    int16_t centerY;
+}CollsionPos_t;
 
 /*********************************************** Data Structures ********************************************************************/
 
@@ -281,10 +298,6 @@ void WaitInit();
 
 
 /*********************************************** Public Functions *********************************************************************/
-/*
- * Returns either Host or Client depending on button press
- */
-playerType GetPlayerRole();
 
 /*
  * Draw players given center X center coordinate
@@ -305,6 +318,8 @@ void UpdateBallOnScreen(PrevBall_t * previousBall, Ball_t * currentBall, uint16_
  * Initializes and prints initial game state
  */
 void InitBoardState();
+
+collisionPosition collision(CollsionPos_t A, CollsionPos_t B);
 
 /*********************************************** Public Functions *********************************************************************/
 

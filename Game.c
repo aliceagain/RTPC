@@ -257,7 +257,36 @@ void MoveBall(){
       G8RTOS_SignalSemaphore(&lcd);
       G8RTOS_KillSelf();
     }
-    //TODO: Collision checks
+
+    switch (collision((CollsionPos_t){PADDLE_WID,PADDLE_LEN+WIGGLE_ROOM,gameState.players[CLIENT].currentCenter,TOP_PLAYER_CENTER_Y},
+                      (CollsionPos_t){BALL_SIZE,BALL_SIZE,ball->currentCenterX,ball->currentCenterY})){
+      case CTOP:
+      case CBOTTOM:
+        ball->currentVelocityY *= -1;
+        break;
+      case CRIGHT:
+      case CLEFT:
+        ball->currentVelocityX *= -1;
+        break;
+      case CNONE:
+        break;
+    }
+
+    switch (collision((CollsionPos_t){PADDLE_WID,PADDLE_LEN+WIGGLE_ROOM,gameState.players[CLIENT].currentCenter,BOTTOM_PLAYER_CENTER_Y},
+                      (CollsionPos_t){BALL_SIZE,BALL_SIZE,ball->currentCenterX,ball->currentCenterY})){
+      case CTOP:
+      case CBOTTOM:
+        ball->currentVelocityY *= -1;
+        break;
+      case CRIGHT:
+      case CLEFT:
+        ball->currentVelocityX *= -1;
+        break;
+      case CNONE:
+        break;
+    }
+
+    sleep(35);
   }
 }
 
@@ -395,12 +424,6 @@ void WaitInit(){
 
 
 /*********************************************** Public Functions *********************************************************************/
-/*
- * Returns either Host or Client depending on button press
- */
-playerType GetPlayerRole(){
-
-}
 
 /*
  * Draw players given center X center coordinate
@@ -510,6 +533,33 @@ void InitBoardState(){
 
   DrawPlayer(&gameState.players[HOST]);
   DrawPlayer(&gameState.players[CLIENT]);
+}
+
+collisionPosition collision(CollsionPos_t A, CollsionPos_t B){
+  int32_t w = 0.5 * (A.width + B.width);
+  int32_t h = 0.5 * (A.height + B.height);
+  int32_t dx = A.centerX - B.centerX;
+  int32_t dy = A.centerY - B.centerY;
+
+  if (abs(dx) <= w && abs(dy) <= h){
+    /* collision! */
+    int32_t wy = w * dy;
+    int32_t hx = h * dx;
+    if (wy > hx){
+      if (wy > -hx){
+        return CTOP;
+      }else{
+        return CBOTTOM;
+      }
+    }else{
+      if (wy > -hx){
+       return CRIGHT;
+      }else{
+        return CLEFT;
+      }
+    }
+  }
+  return CNONE;
 }
 
 /*********************************************** Public Functions *********************************************************************/
