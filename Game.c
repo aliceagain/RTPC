@@ -43,12 +43,13 @@ void JoinGame(){
   G8RTOS_SignalSemaphore(&lcd);
 
   //change priorities later
+  G8RTOS_AddThread(Idle, 255, NULL);
   G8RTOS_AddThread(ReadJoystickClient, 4, NULL);
   G8RTOS_AddThread(SendDataToHost, 8, NULL);
   G8RTOS_AddThread(ReceiveDataFromHost, 6, NULL);
   G8RTOS_AddThread(DrawObjects, 5, NULL);
   G8RTOS_AddThread(MoveLEDs, 250, NULL);
-  G8RTOS_AddThread(Idle, 255, NULL);
+  
   
   G8RTOS_KillSelf();
   
@@ -59,26 +60,46 @@ void JoinGame(){
  * Thread that receives game state packets from host
  */
 void ReceiveDataFromHost(){
+  while(1){
+    G8RTOS_WaitSemaphore(&cc3100);
+    while(ReceiveData((uint8_t *)&gameState, sizeof(GameState_t)) <= 0){
+      G8RTOS_SignalSemaphore(&cc3100);  //unsure about this sequence
+      sleep(1);
+      G8RTOS_WaitSemaphore(&cc3100);
+    }
+    G8RTOS_SignalSemaphore(&cc3100);
 
+    if(gameState.gameDone == true){
+      G8RTOS_AddThread(EndOfGameClient, 0, NULL);
+    }
+    sleep(5);
+  }
 }
 
 /*
  * Thread that sends UDP packets to host
  */
 void SendDataToHost(){
-
+  while(1){
+    G8RTOS_WaitSemaphore(&cc3100);
+    SendData((uint8_t *)&gameState.player, HOST_IP_ADDR, sizeof(SpecificPlayerInfo_t));
+    G8RTOS_SignalSemaphore(&cc3100);
+    sleep(2);
+  }
 }
 
 /*
  * Thread to read client's joystick
  */
 void ReadJoystickClient(){
-  int16_t xcoord, ycoord; //ycoord not needed
-  G8RTOS_InitFIFO(JOYSTICK_CLIENTFIFO);
-  int16_t  
+  int16_t xcoord, ycoord, xoffset, yoffset; //ycoord not needed
+  GetJoystickCoordinates(&xoffset, &yoffset); //this will get the offset ASSUMING joystick is in neutral position
+
+  //G8RTOS_InitFIFO(JOYSTICK_CLIENTFIFO); 
   while(1){
     GetJoystickCoordinates(&xcoord, &ycoord);   //read x coord;
-    
+    //writeFIFO(JOYSTICK_CLIENTFIFO,xcoord - xoffset);
+    gameState.player.displacement = xcoord;
     sleep(10);
   }
   
@@ -89,6 +110,39 @@ void ReadJoystickClient(){
  * End of game for the client
  */
 void EndOfGameClient(){
+
+  G8RTOS_WaitSemaphore(&cc3100);
+  G8RTOS_WaitSemaphore(&lcd);
+
+  G8RTOS_KillThread(ReadJoystickClient);
+  G8RTOS_KillThread(SendDataToHost);
+  G8RTOS_KillThread(ReceiveDataFromHost);
+  G8RTOS_KillThread(DrawObjects);
+  G8RTOS_KillThread(MoveLEDs);
+  G8RTOS_KillThread(Idle);
+
+  G8RTOS_SignalSemaphore(&lcd);
+  G8RTOS_SignalSemaphore(&cc3100);
+
+  if(gameState.winner == true){
+    LCD_Clear(PLAYER_RED);  //red = host ?
+  }
+  else{
+    LCD_Clear(PLAYER_BLUE); //blue = client ?
+  }
+
+  while(ReceiveData((uint8_t *)&gameState, sizeof(GameState_t)) <= 0);  //** CHECK: wait for new game state to see if restart?
+
+  G8RTOS_AddThread(Idle, 255, NULL);
+  G8RTOS_AddThread(ReadJoystickClient, 4, NULL);
+  G8RTOS_AddThread(SendDataToHost, 8, NULL);
+  G8RTOS_AddThread(ReceiveDataFromHost, 6, NULL);
+  G8RTOS_AddThread(DrawObjects, 5, NULL);
+  G8RTOS_AddThread(MoveLEDs, 250, NULL);
+
+  G8RTOS_KillSelf();
+
+
 
 }
 /*********************************************** Client Threads *********************************************************************/
