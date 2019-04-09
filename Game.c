@@ -10,6 +10,7 @@ uint16_t ballColors[8] = {0xF81F,0x07E0,0x7FFF,0xFFE0,0xF11F,0xFD20,0xfdba,0xdfe
  * Thread for client to join game
  */
 void JoinGame(){
+  G8RTOS_AddThread(IdleThread, 255, NULL);
   G8RTOS_InitSemaphore(&cc3100, 1);
   G8RTOS_InitSemaphore(&lcd, 1);
   initCC3100(Client);
@@ -37,12 +38,8 @@ void JoinGame(){
 
   P2->DIR |= BLUE_LED;  //p1.0 set to output
   BITBAND_PERI(P2->OUT, 2) = 1;  //toggle led on
-  
-  G8RTOS_WaitSemaphore(&lcd);
-  LCD_Init(false);
-  LCD_Clear(LCD_GRAY);
-  LCD_DrawRectangle(ARENA_MIN_X, ARENA_MAX_X, ARENA_MIN_X, ARENA_MAX_Y,BACK_COLOR);
-  G8RTOS_SignalSemaphore(&lcd);
+
+  InitBoardState();
 
   //change priorities later
   G8RTOS_AddThread(ReadJoystickClient, 4, NULL);
@@ -50,11 +47,8 @@ void JoinGame(){
   G8RTOS_AddThread(ReceiveDataFromHost, 6, NULL);
   G8RTOS_AddThread(DrawObjects, 5, NULL);
   G8RTOS_AddThread(MoveLEDs, 250, NULL);
-  G8RTOS_AddThread(IdleThread, 255, NULL);
   
   G8RTOS_KillSelf();
-  
-  while(1);
 }
 
 /*
@@ -64,7 +58,7 @@ void ReceiveDataFromHost(){
   while(1){
     G8RTOS_WaitSemaphore(&cc3100);
     while(ReceiveData((uint8_t *)&gameState, sizeof(GameState_t)) <= 0){
-      G8RTOS_SignalSemaphore(&cc3100);  //unsure about this sequence
+      G8RTOS_SignalSemaphore(&cc3100);  
       sleep(1);
       G8RTOS_WaitSemaphore(&cc3100);
     }
@@ -125,21 +119,26 @@ void EndOfGameClient(){
   G8RTOS_SignalSemaphore(&lcd);
   G8RTOS_SignalSemaphore(&cc3100);
 
-  if(gameState.winner == true){
-    LCD_Clear(PLAYER_RED);  //red = host ?
+  if(gameState.winner == HOST){
+    LCD_Clear(gameState.players[HOST].color);  
   }
   else{
-    LCD_Clear(PLAYER_BLUE); //blue = client ?
+    LCD_Clear(gameState.players[CLIENT].color); 
   }
 
   while(ReceiveData((uint8_t *)&gameState, sizeof(GameState_t)) <= 0);  //** CHECK: wait for new game state to see if restart?
 
+  InitBoardState(); //re-init board state
+
+  //re-add threads
   G8RTOS_AddThread(IdleThread, 255, NULL);
   G8RTOS_AddThread(ReadJoystickClient, 4, NULL);
   G8RTOS_AddThread(SendDataToHost, 8, NULL);
   G8RTOS_AddThread(ReceiveDataFromHost, 6, NULL);
   G8RTOS_AddThread(DrawObjects, 5, NULL);
   G8RTOS_AddThread(MoveLEDs, 250, NULL);
+
+  //reset game variables ***
 
   G8RTOS_KillSelf();
 
