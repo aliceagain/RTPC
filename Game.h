@@ -21,9 +21,12 @@
 /* Semaphores here */ 
 semaphore_t cc3100;
 semaphore_t lcd;
+
 /*********************************************** Externs ********************************************************************/
 
 /*********************************************** Global Defines ********************************************************************/
+#define abs(x) x < 0 ? -x : x
+
 #define MAX_NUM_OF_PLAYERS  2
 #define MAX_NUM_OF_BALLS    8
 
@@ -88,6 +91,9 @@ semaphore_t lcd;
 #define BLUE_LED BIT2
 #define RED_LED BIT0
 
+#define CLIENT 0
+#define HOST 1
+
 /* Used for different FIFO names */
 #define JOYSTICK_CLIENTFIFO CLIENT
 #define JOYSTICK_HOSTFIFO HOST
@@ -105,6 +111,15 @@ typedef enum
     BOTTOM = 0,
     TOP = 1
 }playerPosition;
+
+typedef enum
+{
+    CNONE = -1,
+    CTOP = 0,
+    CBOTTOM = 1,
+    CRIGHT = 2,
+    CLEFT = 3
+}collisionPosition;
 
 /*********************************************** Global Defines ********************************************************************/
 
@@ -142,6 +157,8 @@ typedef struct
 {
     int16_t currentCenterX;
     int16_t currentCenterY;
+    int16_t currentVelocityX;
+    int16_t currentVelocityY;
     uint16_t color;
     bool alive;
 } Ball_t;
@@ -178,6 +195,14 @@ typedef struct
 {
     int16_t Center;
 }PrevPlayer_t;
+
+typedef struct{
+    int16_t width;
+    int16_t height;
+    int16_t centerX;
+    int16_t centerY;
+}CollsionPos_t;
+
 /*********************************************** Data Structures ********************************************************************/
 
 
@@ -273,10 +298,6 @@ void WaitInit();
 
 
 /*********************************************** Public Functions *********************************************************************/
-/*
- * Returns either Host or Client depending on button press
- */
-playerType GetPlayerRole();
 
 /*
  * Draw players given center X center coordinate
@@ -297,6 +318,8 @@ void UpdateBallOnScreen(PrevBall_t * previousBall, Ball_t * currentBall, uint16_
  * Initializes and prints initial game state
  */
 void InitBoardState();
+
+collisionPosition collision(CollsionPos_t A, CollsionPos_t B);
 
 /*********************************************** Public Functions *********************************************************************/
 
