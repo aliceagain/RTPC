@@ -191,7 +191,10 @@ void ReadJoystickHost(){
   int16_t xcoord, ycoord; //ycoord not needed
   while(1){
     GetJoystickCoordinates(&xcoord, &ycoord);   //read x coord;
-    //TODO: Turn ADC value into something realistic for movement.
+    if(xcoord < 1000 && xcoord > -1000 ){
+        xcoord = 0;
+    }
+    xcoord>>=9;
     sleep(10);
     gameState.players[HOST].currentCenter += xcoord;
   }  
