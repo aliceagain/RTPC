@@ -316,10 +316,11 @@ void EndOfGameHost(){
     P4->IE |= BIT4;
     G8RTOS_AddAPeriodicEvent(EndofGameButtonHandler,6,PORT4_IRQn);
     while(!restart);
-    SendData((uint8_t * ) &restart, gameState.player.IP_address, sizeof(sizeof(bool)));
     restart = false;
 
     InitBoardState();
+    SendData((uint8_t * ) &gameState, gameState.player.IP_address, sizeof(gameState));
+
 
     //change priorities later
     G8RTOS_AddThread(GenerateBall, 0, NULL);
