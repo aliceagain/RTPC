@@ -217,8 +217,8 @@ void SendDataToClient(){
  * Thread that receives UDP packets from client
  */
 void ReceiveDataFromClient(){
+  int16_t tempDisplacement;
   while(1){
-    int16_t tempDisplacement;
     G8RTOS_WaitSemaphore(&cc3100);
     while(ReceiveData((uint8_t * )&tempDisplacement, sizeof(int16_t)) == NOTHING_RECEIVED){
       G8RTOS_SignalSemaphore(&cc3100);
@@ -226,6 +226,10 @@ void ReceiveDataFromClient(){
       G8RTOS_WaitSemaphore(&cc3100);
     }
     G8RTOS_SignalSemaphore(&cc3100);
+    if(tempDisplacement < 1000 && tempDisplacement > -1000 ){
+        tempDisplacement = 0;
+    }
+    tempDisplacement>>=10;
     G8RTOS_WaitSemaphore(&player);
     gameState.players[CLIENT].currentCenter += tempDisplacement;
     if(gameState.players[CLIENT].currentCenter > HORIZ_CENTER_MAX_PL){
