@@ -24,12 +24,10 @@ void JoinGame(){
   G8RTOS_InitSemaphore(&player, 1);
   initCC3100(Client);
 
-  int16_t xcoord, ycoord; //just used to initialize joystick displacement (y not necessary)
-  GetJoystickCoordinates(&xcoord, &ycoord);
 
   //init specific player info for client
   gameState.player.IP_address = getLocalIP();
-  gameState.player.displacement = xcoord;
+  gameState.player.displacement = 0;
   gameState.player.playerNumber = CLIENT;  //0 = client, 1 = host
   gameState.player.ready = true;
   gameState.player.joined = false;
@@ -85,7 +83,7 @@ void ReceiveDataFromHost(){
 void SendDataToHost(){
   while(1){
     G8RTOS_WaitSemaphore(&cc3100);
-    SendData((uint8_t *)&gameState.player, HOST_IP_ADDR, sizeof(SpecificPlayerInfo_t));
+    SendData((uint8_t *)&gameState.player.displacement, HOST_IP_ADDR, sizeof(SpecificPlayerInfo_t));
     G8RTOS_SignalSemaphore(&cc3100);
     sleep(2);
   }
@@ -95,13 +93,10 @@ void SendDataToHost(){
  * Thread to read client's joystick
  */
 void ReadJoystickClient(){
-  int16_t xcoord, ycoord, xoffset, yoffset; //ycoord not needed
-  GetJoystickCoordinates(&xoffset, &yoffset); //this will get the offset ASSUMING joystick is in neutral position
+  int16_t xcoord, ycoord;
 
-  //G8RTOS_InitFIFO(JOYSTICK_CLIENTFIFO); 
   while(1){
     GetJoystickCoordinates(&xcoord, &ycoord);   //read x coord;
-    //writeFIFO(JOYSTICK_CLIENTFIFO,xcoord - xoffset);
     gameState.player.displacement = xcoord;
     sleep(10);
   }
