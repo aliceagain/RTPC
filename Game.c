@@ -65,6 +65,7 @@ void ReceiveDataFromHost(){
     G8RTOS_WaitSemaphore(&cc3100);
     while(ReceiveData((uint8_t *)&gameState, sizeof(GameState_t)) == NOTHING_RECEIVED){
       G8RTOS_SignalSemaphore(&cc3100);  
+
       sleep(1);
       G8RTOS_WaitSemaphore(&cc3100);
     }
@@ -199,7 +200,7 @@ void CreateGame(){
 void SendDataToClient(){
   while(1){
     G8RTOS_WaitSemaphore(&cc3100);
-    SendData((uint8_t * ) &gameState, gameState.player.IP_address, sizeof(gameState));
+    SendData((uint8_t * ) &gameState, gameState.player.IP_address, sizeof(GameState_t));
     G8RTOS_SignalSemaphore(&cc3100);
     if(gameState.gameDone){
       G8RTOS_AddThread(EndOfGameHost, 0, endofgameName);
@@ -214,25 +215,25 @@ void SendDataToClient(){
 void ReceiveDataFromClient(){
   int16_t tempDisplacement;
   while(1){
-    G8RTOS_WaitSemaphore(&cc3100);
-    while(ReceiveData((uint8_t * )&tempDisplacement, sizeof(int16_t)) == NOTHING_RECEIVED){
-      G8RTOS_SignalSemaphore(&cc3100);
-      sleep(1);
-      G8RTOS_WaitSemaphore(&cc3100);
-    }
-    G8RTOS_SignalSemaphore(&cc3100);
-    if(tempDisplacement < 1000 && tempDisplacement > -1000 ){
-        tempDisplacement = 0;
-    }
-    tempDisplacement>>=10;
-    G8RTOS_WaitSemaphore(&player);
-    gameState.players[CLIENT].currentCenter += tempDisplacement;
-    if(gameState.players[CLIENT].currentCenter > HORIZ_CENTER_MAX_PL){
-      gameState.players[CLIENT].currentCenter = HORIZ_CENTER_MAX_PL;
-    }else if(gameState.players[CLIENT].currentCenter < HORIZ_CENTER_MIN_PL){
-      gameState.players[CLIENT].currentCenter = HORIZ_CENTER_MIN_PL;
-    }
-    G8RTOS_SignalSemaphore(&player);
+   G8RTOS_WaitSemaphore(&cc3100);
+   while(ReceiveData((uint8_t * )&tempDisplacement, sizeof(int16_t)) == NOTHING_RECEIVED){
+     G8RTOS_SignalSemaphore(&cc3100);
+     sleep(1);
+     G8RTOS_WaitSemaphore(&cc3100);
+   }
+   G8RTOS_SignalSemaphore(&cc3100);
+   if(tempDisplacement < 1000 && tempDisplacement > -1000 ){
+       tempDisplacement = 0;
+   }
+   tempDisplacement>>=10;
+   G8RTOS_WaitSemaphore(&player);
+   gameState.players[CLIENT].currentCenter += tempDisplacement;
+   if(gameState.players[CLIENT].currentCenter > HORIZ_CENTER_MAX_PL){
+     gameState.players[CLIENT].currentCenter = HORIZ_CENTER_MAX_PL;
+   }else if(gameState.players[CLIENT].currentCenter < HORIZ_CENTER_MIN_PL){
+     gameState.players[CLIENT].currentCenter = HORIZ_CENTER_MIN_PL;
+   }
+   G8RTOS_SignalSemaphore(&player);
     sleep(2);
   }
 }
@@ -257,6 +258,7 @@ void ReadJoystickHost(){
   int16_t xcoord, ycoord; //ycoord not needed
   while(1){
     GetJoystickCoordinates(&xcoord, &ycoord);   //read x coord;
+    xcoord += 500;
     if(xcoord < 1000 && xcoord > -1000 ){
         xcoord = 0;
     }
@@ -395,8 +397,9 @@ void EndOfGameHost(){
     restart = false;
 
     InitBoardState();
+    G8RTOS_WaitSemaphore(&cc3100);
     SendData((uint8_t * ) &gameState, gameState.player.IP_address, sizeof(gameState));
-
+    G8RTOS_SignalSemaphore(&cc3100);
 
     //change priorities later
     G8RTOS_AddThread(GenerateBall, 8, generateballName);
