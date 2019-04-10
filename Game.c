@@ -523,40 +523,49 @@ void DrawPlayer(GeneralPlayerInfo_t * player){
  * Updates player's paddle based on current and new center
  */
 void UpdatePlayerOnScreen(PrevPlayer_t * prevPlayerIn, GeneralPlayerInfo_t * outPlayer){
-  int16_t posDiff = prevPlayerIn->Center - outPlayer->currentCenter;
+  int16_t posDiff = outPlayer->currentCenter - prevPlayerIn->Center;
   G8RTOS_WaitSemaphore(&lcd);
+  int16_t startY;
+  int16_t stopY;
+  if(outPlayer->position == TOP){
+      startY = TOP_PLAYER_CENTER_Y-PADDLE_WID_D2;
+      stopY = TOP_PLAYER_CENTER_Y+PADDLE_WID_D2;
+  }else{
+      startY = BOTTOM_PLAYER_CENTER_Y-PADDLE_WID_D2;
+      stopY = BOTTOM_PLAYER_CENTER_Y+PADDLE_WID_D2;
+  }
   if(posDiff > 0 && posDiff < PADDLE_LEN_D2 ){
+      LCD_DrawRectangle(prevPlayerIn->Center+PADDLE_LEN_D2,
+                        outPlayer->currentCenter+PADDLE_LEN_D2,
+                        startY,
+                        stopY,
+                        BACK_COLOR);
+      LCD_DrawRectangle(prevPlayerIn->Center-PADDLE_LEN_D2,
+                        outPlayer->currentCenter-PADDLE_LEN_D2,
+                        startY,
+                        stopY,
+                        outPlayer->color);
+  }else if(posDiff < 0 && posDiff > -PADDLE_LEN_D2){
     LCD_DrawRectangle(outPlayer->currentCenter+PADDLE_LEN_D2,
                       prevPlayerIn->Center+PADDLE_LEN_D2,
-                      HORIZ_CENTER_MAX_PL-PADDLE_WID_D2,
-                      HORIZ_CENTER_MAX_PL+PADDLE_WID_D2,
+                      startY,
+                      stopY,
                       BACK_COLOR);
     LCD_DrawRectangle(outPlayer->currentCenter-PADDLE_LEN_D2,
                       prevPlayerIn->Center-PADDLE_LEN_D2,
-                      HORIZ_CENTER_MAX_PL-PADDLE_WID_D2,
-                      HORIZ_CENTER_MAX_PL+PADDLE_WID_D2,
-                      outPlayer->color);
-  }else if(posDiff < 0 && posDiff > -PADDLE_LEN_D2){
-    LCD_DrawRectangle(prevPlayerIn->Center-PADDLE_LEN_D2,
-                      outPlayer->currentCenter-PADDLE_LEN_D2,
-                      HORIZ_CENTER_MAX_PL-PADDLE_WID_D2,
-                      HORIZ_CENTER_MAX_PL+PADDLE_WID_D2,
-                      BACK_COLOR);
-    LCD_DrawRectangle(prevPlayerIn->Center+PADDLE_LEN_D2,
-                      outPlayer->currentCenter+PADDLE_LEN_D2,
-                      HORIZ_CENTER_MAX_PL-PADDLE_WID_D2,
-                      HORIZ_CENTER_MAX_PL+PADDLE_WID_D2,
+                      startY,
+                      stopY,
                       outPlayer->color);
   }else{
     LCD_DrawRectangle(prevPlayerIn->Center-PADDLE_LEN_D2,
                       prevPlayerIn->Center+PADDLE_LEN_D2,
-                      HORIZ_CENTER_MAX_PL-PADDLE_WID_D2,
-                      HORIZ_CENTER_MAX_PL+PADDLE_WID_D2,
+                      startY,
+                      stopY,
                       BACK_COLOR);
     LCD_DrawRectangle(outPlayer->currentCenter-PADDLE_LEN_D2,
                       outPlayer->currentCenter+PADDLE_LEN_D2,
-                      HORIZ_CENTER_MAX_PL-PADDLE_WID_D2,
-                      HORIZ_CENTER_MAX_PL+PADDLE_WID_D2,
+                      startY,
+                      stopY,
                       outPlayer->color);
   }
   G8RTOS_SignalSemaphore(&lcd);
