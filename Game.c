@@ -4,18 +4,24 @@
 /*********************************************** Global Vars *********************************************************************/
 GameState_t gameState;
 uint16_t ballColors[8] = {0xF81F,0x07E0,0x7FFF,0xFFE0,0xF11F,0xFD20,0xfdba,0xdfe4};
+char readjoystickName[] = "readJoystick";
+char idlethreadName[] = "idle";
+char senddatatName[] = "sendData";
+char receivedataName[] = "receiveData";
+char drawobjectsName[] = "DrawObjects";
+char moveledsName[] = "MoveLEDs";
+char endofgameName[] = "EndofGame";
+char generateballName[] = "GenerateBall";
+char moveballName[] = "MoveBall";
 
 /*********************************************** Client Threads *********************************************************************/
 /*
  * Thread for client to join game
  */
 void JoinGame(){
-  G8RTOS_AddThread(IdleThread, 255, NULL);
   G8RTOS_InitSemaphore(&cc3100, 1);
   G8RTOS_InitSemaphore(&lcd, 1);
   initCC3100(Client);
-
-  G8RTOS_InitSemaphore(&cc3100, 1);
 
   int16_t xcoord, ycoord; //just used to initialize joystick displacement (y not necessary)
   GetJoystickCoordinates(&xcoord, &ycoord);
@@ -42,11 +48,12 @@ void JoinGame(){
   InitBoardState();
 
   //change priorities later
-  G8RTOS_AddThread(ReadJoystickClient, 4, NULL);
-  G8RTOS_AddThread(SendDataToHost, 8, NULL);
-  G8RTOS_AddThread(ReceiveDataFromHost, 6, NULL);
-  G8RTOS_AddThread(DrawObjects, 5, NULL);
-  G8RTOS_AddThread(MoveLEDs, 250, NULL);
+  G8RTOS_AddThread(ReadJoystickClient, 4, readjoystickName);
+  G8RTOS_AddThread(SendDataToHost, 8, senddatatName);
+  G8RTOS_AddThread(ReceiveDataFromHost, 6, receivedataName);
+  G8RTOS_AddThread(DrawObjects, 5, drawobjectsName);
+  G8RTOS_AddThread(IdleThread, 254, idlethreadName);
+  G8RTOS_AddThread(MoveLEDs, 250, moveledsName);
   
   G8RTOS_KillSelf();
 }
@@ -65,7 +72,7 @@ void ReceiveDataFromHost(){
     G8RTOS_SignalSemaphore(&cc3100);
 
     if(gameState.gameDone == true){
-      G8RTOS_AddThread(EndOfGameClient, 0, NULL);
+      G8RTOS_AddThread(EndOfGameClient, 0, endofgameName);
     }
     sleep(5);
   }
@@ -109,34 +116,33 @@ void EndOfGameClient(){
   G8RTOS_WaitSemaphore(&cc3100);
   G8RTOS_WaitSemaphore(&lcd);
 
-  G8RTOS_KillThread(ReadJoystickClient);
-  G8RTOS_KillThread(SendDataToHost);
-  G8RTOS_KillThread(ReceiveDataFromHost);
-  G8RTOS_KillThread(DrawObjects);
-  G8RTOS_KillThread(MoveLEDs);
-  G8RTOS_KillThread(IdleThread);
+  G8RTOS_KillOthers();
 
   G8RTOS_SignalSemaphore(&lcd);
   G8RTOS_SignalSemaphore(&cc3100);
 
+  G8RTOS_WaitSemaphore(&lcd);
   if(gameState.winner == HOST){
     LCD_Clear(gameState.players[HOST].color);  
   }
   else{
     LCD_Clear(gameState.players[CLIENT].color); 
   }
+  G8RTOS_SignalSemaphore(&lcd);
 
+  G8RTOS_WaitSemaphore(&cc3100);
   while(ReceiveData((uint8_t *)&gameState, sizeof(GameState_t)) <= 0);  //** CHECK: wait for new game state to see if restart?
+  G8RTOS_SignalSemaphore(&cc3100);
 
   InitBoardState(); //re-init board state
 
   //re-add threads
-  G8RTOS_AddThread(IdleThread, 255, NULL);
-  G8RTOS_AddThread(ReadJoystickClient, 4, NULL);
-  G8RTOS_AddThread(SendDataToHost, 8, NULL);
-  G8RTOS_AddThread(ReceiveDataFromHost, 6, NULL);
-  G8RTOS_AddThread(DrawObjects, 5, NULL);
-  G8RTOS_AddThread(MoveLEDs, 250, NULL);
+  G8RTOS_AddThread(IdleThread, 254, idlethreadName);
+  G8RTOS_AddThread(ReadJoystickClient, 4, readjoystickName);
+  G8RTOS_AddThread(SendDataToHost, 8, senddatatName);
+  G8RTOS_AddThread(ReceiveDataFromHost, 6, receivedataName);
+  G8RTOS_AddThread(DrawObjects, 5, drawobjectsName);
+  G8RTOS_AddThread(MoveLEDs, 250, moveledsName);
 
   //reset game variables ***
 
@@ -153,7 +159,6 @@ void EndOfGameClient(){
  * Thread for the host to create a game
  */
 void CreateGame(){
-  G8RTOS_AddThread(IdleThread,255,NULL);
   G8RTOS_InitSemaphore(&cc3100, 1);
   G8RTOS_InitSemaphore(&lcd, 1);
 
@@ -175,12 +180,14 @@ void CreateGame(){
   InitBoardState();
 
   //change priorities later
-  G8RTOS_AddThread(GenerateBall, 8, NULL);
-  G8RTOS_AddThread(DrawObjects, 5, NULL);
-  G8RTOS_AddThread(ReadJoystickHost, 4, NULL);
-  G8RTOS_AddThread(SendDataToClient, 7, NULL);
-  G8RTOS_AddThread(ReceiveDataFromClient, 6, NULL);
-  G8RTOS_AddThread(MoveLEDs, 250, NULL);
+  G8RTOS_AddThread(GenerateBall, 8, generateballName);
+  G8RTOS_AddThread(DrawObjects, 5, drawobjectsName);
+  G8RTOS_AddThread(ReadJoystickHost, 4, readjoystickName);
+  G8RTOS_AddThread(SendDataToClient, 7, senddatatName);
+  G8RTOS_AddThread(ReceiveDataFromClient, 6, receivedataName);
+  G8RTOS_AddThread(MoveLEDs, 250, moveledsName);
+  G8RTOS_AddThread(IdleThread,254,idlethreadName);
+
 
   G8RTOS_KillSelf();
 
@@ -192,9 +199,11 @@ void CreateGame(){
  */
 void SendDataToClient(){
   while(1){
+    G8RTOS_WaitSemaphore(&cc3100);
     SendData((uint8_t * ) &gameState, gameState.player.IP_address, sizeof(gameState));
+    G8RTOS_SignalSemaphore(&cc3100);
     if(gameState.gameDone){
-      G8RTOS_AddThread(EndOfGameHost, 0, NULL);
+      G8RTOS_AddThread(EndOfGameHost, 0, endofgameName);
     }
     sleep(5);
   }
@@ -208,11 +217,11 @@ void ReceiveDataFromClient(){
     int16_t tempDisplacement;
     G8RTOS_WaitSemaphore(&cc3100);
     while(ReceiveData((uint8_t * )&tempDisplacement, sizeof(int16_t)) == NOTHING_RECEIVED){
-      G8RTOS_SignalSemaphore(&lcd);
+      G8RTOS_SignalSemaphore(&cc3100);
       sleep(1);
       G8RTOS_WaitSemaphore(&cc3100);
     }
-    G8RTOS_SignalSemaphore(&lcd);
+    G8RTOS_SignalSemaphore(&cc3100);
     gameState.players[CLIENT].currentCenter += tempDisplacement;
     if(gameState.players[CLIENT].currentCenter > HORIZ_CENTER_MAX_PL){
       gameState.players[CLIENT].currentCenter = HORIZ_CENTER_MAX_PL;
@@ -229,7 +238,7 @@ void ReceiveDataFromClient(){
 void GenerateBall(){
   while(1){
     if(gameState.numberOfBalls < MAX_NUM_OF_BALLS){
-      G8RTOS_AddThread(MoveBall,0,NULL);
+      G8RTOS_AddThread(MoveBall,0,moveballName);
       gameState.numberOfBalls++;
     }
     sleep(100*gameState.numberOfBalls);
@@ -365,6 +374,7 @@ void EndOfGameHost(){
     G8RTOS_WaitSemaphore(&lcd);
     LCD_Clear(gameState.winner == HOST ? gameState.players[HOST].color : gameState.players[CLIENT].color);
     LCD_Text(20,100,(uint8_t*)endOfGameText,LCD_BLACK);
+    G8RTOS_SignalSemaphore(&lcd);
     P4->IE |= BIT4;
     G8RTOS_AddAPeriodicEvent(EndofGameButtonHandler,6,PORT4_IRQn);
     while(!restart);
@@ -375,13 +385,13 @@ void EndOfGameHost(){
 
 
     //change priorities later
-    G8RTOS_AddThread(GenerateBall, 8, NULL);
-    G8RTOS_AddThread(DrawObjects, 5, NULL);
-    G8RTOS_AddThread(ReadJoystickHost, 4, NULL);
-    G8RTOS_AddThread(SendDataToClient, 7, NULL);
-    G8RTOS_AddThread(ReceiveDataFromClient, 6, NULL);
-    G8RTOS_AddThread(MoveLEDs, 250, NULL);
-    G8RTOS_AddThread(IdleThread, 255, NULL);
+    G8RTOS_AddThread(GenerateBall, 8, generateballName);
+    G8RTOS_AddThread(DrawObjects, 5, drawobjectsName);
+    G8RTOS_AddThread(ReadJoystickHost, 4, readjoystickName);
+    G8RTOS_AddThread(SendDataToClient, 7, senddatatName);
+    G8RTOS_AddThread(ReceiveDataFromClient, 6, receivedataName);
+    G8RTOS_AddThread(MoveLEDs, 250, moveledsName);
+    G8RTOS_AddThread(IdleThread, 254, idlethreadName);
 
     G8RTOS_KillSelf();
 }
@@ -394,7 +404,9 @@ void EndOfGameHost(){
  * Idle thread
  */
 void IdleThread(){
-  while(1);
+  while(1){
+      G8RTOS_Yield();
+  }
 }
 
 /*
@@ -485,11 +497,13 @@ void WaitInit(){
  * Draw players given center X center coordinate
  */
 void DrawPlayer(GeneralPlayerInfo_t * player){
+  G8RTOS_WaitSemaphore(&lcd);
   LCD_DrawRectangle(player->position-PADDLE_LEN_D2,
                   player->position+PADDLE_LEN_D2,
-                  HORIZ_CENTER_MAX_PL+PADDLE_WID_D2,
                   HORIZ_CENTER_MAX_PL-PADDLE_WID_D2,
+                  HORIZ_CENTER_MAX_PL+PADDLE_WID_D2,
                   player->color);
+  G8RTOS_SignalSemaphore(&lcd);
 }
 
 /*
@@ -497,40 +511,42 @@ void DrawPlayer(GeneralPlayerInfo_t * player){
  */
 void UpdatePlayerOnScreen(PrevPlayer_t * prevPlayerIn, GeneralPlayerInfo_t * outPlayer){
   int16_t posDiff = outPlayer->currentCenter - prevPlayerIn->Center;
+  G8RTOS_WaitSemaphore(&lcd);
   if(posDiff > 0 && posDiff < PADDLE_LEN_D2 ){
     LCD_DrawRectangle(outPlayer->currentCenter+PADDLE_LEN_D2,
                       prevPlayerIn->Center+PADDLE_LEN_D2,
-                      HORIZ_CENTER_MAX_PL+PADDLE_WID_D2,
                       HORIZ_CENTER_MAX_PL-PADDLE_WID_D2,
+                      HORIZ_CENTER_MAX_PL+PADDLE_WID_D2,
                       BACK_COLOR);
     LCD_DrawRectangle(outPlayer->currentCenter-PADDLE_LEN_D2,
                       prevPlayerIn->Center-PADDLE_LEN_D2,
-                      HORIZ_CENTER_MAX_PL+PADDLE_WID_D2,
                       HORIZ_CENTER_MAX_PL-PADDLE_WID_D2,
+                      HORIZ_CENTER_MAX_PL+PADDLE_WID_D2,
                       outPlayer->color);
   }else if(posDiff < 0 && posDiff > -PADDLE_LEN_D2){
     LCD_DrawRectangle(outPlayer->currentCenter-PADDLE_LEN_D2,
                       prevPlayerIn->Center-PADDLE_LEN_D2,
-                      HORIZ_CENTER_MAX_PL+PADDLE_WID_D2,
                       HORIZ_CENTER_MAX_PL-PADDLE_WID_D2,
+                      HORIZ_CENTER_MAX_PL+PADDLE_WID_D2,
                       BACK_COLOR);
     LCD_DrawRectangle(outPlayer->currentCenter+PADDLE_LEN_D2,
                       prevPlayerIn->Center+PADDLE_LEN_D2,
-                      HORIZ_CENTER_MAX_PL+PADDLE_WID_D2,
                       HORIZ_CENTER_MAX_PL-PADDLE_WID_D2,
+                      HORIZ_CENTER_MAX_PL+PADDLE_WID_D2,
                       outPlayer->color);
   }else{
     LCD_DrawRectangle(prevPlayerIn->Center-PADDLE_LEN_D2,
                       prevPlayerIn->Center+PADDLE_LEN_D2,
-                      HORIZ_CENTER_MAX_PL+PADDLE_WID_D2,
                       HORIZ_CENTER_MAX_PL-PADDLE_WID_D2,
+                      HORIZ_CENTER_MAX_PL+PADDLE_WID_D2,
                       BACK_COLOR);
     LCD_DrawRectangle(outPlayer->currentCenter-PADDLE_LEN_D2,
                       outPlayer->currentCenter+PADDLE_LEN_D2,
-                      HORIZ_CENTER_MAX_PL+PADDLE_WID_D2,
                       HORIZ_CENTER_MAX_PL-PADDLE_WID_D2,
+                      HORIZ_CENTER_MAX_PL+PADDLE_WID_D2,
                       outPlayer->color);
   }
+  G8RTOS_SignalSemaphore(&lcd);
   prevPlayerIn->Center = outPlayer->currentCenter;
 }
 
