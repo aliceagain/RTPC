@@ -175,13 +175,12 @@ void CreateGame(){
   InitBoardState();
 
   //change priorities later
-  G8RTOS_AddThread(GenerateBall, 0, NULL);
-  G8RTOS_AddThread(DrawObjects, 0, NULL);
-  G8RTOS_AddThread(ReadJoystickHost, 0, NULL);
-  G8RTOS_AddThread(SendDataToClient, 0, NULL);
-  G8RTOS_AddThread(ReceiveDataFromClient, 0, NULL);
-  G8RTOS_AddThread(MoveLEDs, 0, NULL);
-  G8RTOS_AddThread(IdleThread, 255, NULL);
+  G8RTOS_AddThread(GenerateBall, 8, NULL);
+  G8RTOS_AddThread(DrawObjects, 5, NULL);
+  G8RTOS_AddThread(ReadJoystickHost, 4, NULL);
+  G8RTOS_AddThread(SendDataToClient, 7, NULL);
+  G8RTOS_AddThread(ReceiveDataFromClient, 6, NULL);
+  G8RTOS_AddThread(MoveLEDs, 250, NULL);
 
   G8RTOS_KillSelf();
 
@@ -376,12 +375,12 @@ void EndOfGameHost(){
 
 
     //change priorities later
-    G8RTOS_AddThread(GenerateBall, 0, NULL);
-    G8RTOS_AddThread(DrawObjects, 0, NULL);
-    G8RTOS_AddThread(ReadJoystickHost, 0, NULL);
-    G8RTOS_AddThread(SendDataToClient, 0, NULL);
-    G8RTOS_AddThread(ReceiveDataFromClient, 0, NULL);
-    G8RTOS_AddThread(MoveLEDs, 0, NULL);
+    G8RTOS_AddThread(GenerateBall, 8, NULL);
+    G8RTOS_AddThread(DrawObjects, 5, NULL);
+    G8RTOS_AddThread(ReadJoystickHost, 4, NULL);
+    G8RTOS_AddThread(SendDataToClient, 7, NULL);
+    G8RTOS_AddThread(ReceiveDataFromClient, 6, NULL);
+    G8RTOS_AddThread(MoveLEDs, 250, NULL);
     G8RTOS_AddThread(IdleThread, 255, NULL);
 
     G8RTOS_KillSelf();
