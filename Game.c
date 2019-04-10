@@ -38,7 +38,7 @@ void JoinGame(){
   G8RTOS_SignalSemaphore(&cc3100);
 
   G8RTOS_WaitSemaphore(&cc3100);
-  while(ReceiveData((uint8_t *)&gameState.player, sizeof(SpecificPlayerInfo_t)) == NOTHING_RECEIVED);
+  while(ReceiveData((uint8_t *)&gameState, sizeof(GameState_t)) == NOTHING_RECEIVED);
   G8RTOS_SignalSemaphore(&cc3100);
 
   P2->DIR |= BLUE_LED;  //p1.0 set to output
@@ -47,12 +47,14 @@ void JoinGame(){
   InitBoardState();
 
   //change priorities later
-  G8RTOS_AddThread(IdleThread, 254, idlethreadName);
-  G8RTOS_AddThread(ReadJoystickClient, 4, readjoystickName);
-  G8RTOS_AddThread(SendDataToHost, 8, senddatatName);
-  G8RTOS_AddThread(ReceiveDataFromHost, 3, receivedataName);
-  G8RTOS_AddThread(DrawObjects, 6, drawobjectsName);
+
   G8RTOS_AddThread(MoveLEDs, 250, moveledsName);
+  G8RTOS_AddThread(DrawObjects, 1, drawobjectsName);
+  G8RTOS_AddThread(ReadJoystickClient, 4, readjoystickName);
+  G8RTOS_AddThread(SendDataToHost, 3, senddatatName);
+  G8RTOS_AddThread(ReceiveDataFromHost, 2, receivedataName);
+
+  G8RTOS_AddThread(IdleThread, 254, idlethreadName);
   
   G8RTOS_KillSelf();
 }
@@ -61,15 +63,34 @@ void JoinGame(){
  * Thread that receives game state packets from host
  */
 void ReceiveDataFromHost(){
+  int16_t inpacket[40];
   while(1){
     G8RTOS_WaitSemaphore(&cc3100);
-    while(ReceiveData((uint8_t *)&gameState, sizeof(GameState_t)) == NOTHING_RECEIVED){
+    while(ReceiveData((uint8_t *)&inpacket, sizeof(int16_t) * 40) == NOTHING_RECEIVED){
       G8RTOS_SignalSemaphore(&cc3100);  
 
       sleep(1);
       G8RTOS_WaitSemaphore(&cc3100);
     }
     G8RTOS_SignalSemaphore(&cc3100);
+
+    G8RTOS_WaitSemaphore(&player);
+    gameState.players[0].currentCenter = inpacket[0];
+    gameState.players[1].currentCenter = inpacket[1];
+    for(int i = 0; i < MAX_NUM_OF_BALLS; i++){
+      gameState.balls[i].currentCenterX = inpacket[2+i*4];
+      gameState.balls[i].currentCenterY = inpacket[3+i*4];
+      gameState.balls[i].color = inpacket[4+i*4];
+      gameState.balls[i].alive = inpacket[5+i*4];
+    }
+    gameState.winner = inpacket[34];
+    gameState.gameDone = inpacket[35];
+    gameState.LEDScores[0] = inpacket[36];
+    gameState.LEDScores[1] = inpacket[37];
+    gameState.overallScores[0] = inpacket[38];
+    gameState.overallScores[1] = inpacket[39];
+    G8RTOS_SignalSemaphore(&player);
+
 
     if(gameState.gameDone == true){
       G8RTOS_AddThread(EndOfGameClient, 0, endofgameName);
@@ -136,12 +157,12 @@ void EndOfGameClient(){
   InitBoardState(); //re-init board state
 
   //re-add threads
-  G8RTOS_AddThread(IdleThread, 254, idlethreadName);
-  G8RTOS_AddThread(ReadJoystickClient, 4, readjoystickName);
-  G8RTOS_AddThread(SendDataToHost, 8, senddatatName);
-  G8RTOS_AddThread(ReceiveDataFromHost, 5, receivedataName);
-  G8RTOS_AddThread(DrawObjects, 6, drawobjectsName);
   G8RTOS_AddThread(MoveLEDs, 250, moveledsName);
+  G8RTOS_AddThread(DrawObjects, 5, drawobjectsName);
+  G8RTOS_AddThread(ReadJoystickClient, 4, readjoystickName);
+  G8RTOS_AddThread(SendDataToHost, 3, senddatatName);
+  G8RTOS_AddThread(ReceiveDataFromHost, 2, receivedataName);
+  G8RTOS_AddThread(IdleThread, 254, idlethreadName);
 
   //reset game variables ***
 
