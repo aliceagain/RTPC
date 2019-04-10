@@ -50,7 +50,7 @@ void JoinGame(){
   G8RTOS_AddThread(IdleThread, 254, idlethreadName);
   G8RTOS_AddThread(ReadJoystickClient, 4, readjoystickName);
   G8RTOS_AddThread(SendDataToHost, 8, senddatatName);
-  G8RTOS_AddThread(ReceiveDataFromHost, 5, receivedataName);
+  G8RTOS_AddThread(ReceiveDataFromHost, 3, receivedataName);
   G8RTOS_AddThread(DrawObjects, 6, drawobjectsName);
   G8RTOS_AddThread(MoveLEDs, 250, moveledsName);
   
@@ -63,7 +63,7 @@ void JoinGame(){
 void ReceiveDataFromHost(){
   while(1){
     G8RTOS_WaitSemaphore(&cc3100);
-    while(ReceiveData((uint8_t *)&gameState, sizeof(GameState_t)) <= 0){
+    while(ReceiveData((uint8_t *)&gameState, sizeof(GameState_t)) == NOTHING_RECEIVED){
       G8RTOS_SignalSemaphore(&cc3100);  
       sleep(1);
       G8RTOS_WaitSemaphore(&cc3100);
@@ -83,7 +83,7 @@ void ReceiveDataFromHost(){
 void SendDataToHost(){
   while(1){
     G8RTOS_WaitSemaphore(&cc3100);
-    SendData((uint8_t *)&gameState.player.displacement, HOST_IP_ADDR, sizeof(SpecificPlayerInfo_t));
+    SendData((uint8_t *)&gameState.player.displacement, HOST_IP_ADDR, sizeof(int16_t));
     G8RTOS_SignalSemaphore(&cc3100);
     sleep(2);
   }
@@ -182,8 +182,8 @@ void CreateGame(){
   G8RTOS_AddThread(GenerateBall, 8, generateballName);
   G8RTOS_AddThread(DrawObjects, 5, drawobjectsName);
   G8RTOS_AddThread(ReadJoystickHost, 4, readjoystickName);
-  G8RTOS_AddThread(SendDataToClient, 7, senddatatName);
-  G8RTOS_AddThread(ReceiveDataFromClient, 6, receivedataName);
+  G8RTOS_AddThread(SendDataToClient, 6, senddatatName);
+  G8RTOS_AddThread(ReceiveDataFromClient, 7, receivedataName);
   G8RTOS_AddThread(MoveLEDs, 250, moveledsName);
   G8RTOS_AddThread(IdleThread,254,idlethreadName);
 
