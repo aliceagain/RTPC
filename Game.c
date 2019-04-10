@@ -48,11 +48,11 @@ void JoinGame(){
   InitBoardState();
 
   //change priorities later
+  G8RTOS_AddThread(IdleThread, 254, idlethreadName);
   G8RTOS_AddThread(ReadJoystickClient, 4, readjoystickName);
   G8RTOS_AddThread(SendDataToHost, 8, senddatatName);
-  G8RTOS_AddThread(ReceiveDataFromHost, 6, receivedataName);
-  G8RTOS_AddThread(DrawObjects, 5, drawobjectsName);
-  G8RTOS_AddThread(IdleThread, 254, idlethreadName);
+  G8RTOS_AddThread(ReceiveDataFromHost, 5, receivedataName);
+  G8RTOS_AddThread(DrawObjects, 6, drawobjectsName);
   G8RTOS_AddThread(MoveLEDs, 250, moveledsName);
   
   G8RTOS_KillSelf();
@@ -140,8 +140,8 @@ void EndOfGameClient(){
   G8RTOS_AddThread(IdleThread, 254, idlethreadName);
   G8RTOS_AddThread(ReadJoystickClient, 4, readjoystickName);
   G8RTOS_AddThread(SendDataToHost, 8, senddatatName);
-  G8RTOS_AddThread(ReceiveDataFromHost, 6, receivedataName);
-  G8RTOS_AddThread(DrawObjects, 5, drawobjectsName);
+  G8RTOS_AddThread(ReceiveDataFromHost, 5, receivedataName);
+  G8RTOS_AddThread(DrawObjects, 6, drawobjectsName);
   G8RTOS_AddThread(MoveLEDs, 250, moveledsName);
 
   //reset game variables ***
@@ -238,7 +238,7 @@ void ReceiveDataFromClient(){
 void GenerateBall(){
   while(1){
     if(gameState.numberOfBalls < MAX_NUM_OF_BALLS){
-      G8RTOS_AddThread(MoveBall,0,moveballName);
+      G8RTOS_AddThread(MoveBall,100,moveballName);
       gameState.numberOfBalls++;
     }
     sleep(100*gameState.numberOfBalls);
@@ -622,7 +622,7 @@ void InitBoardState(){
   G8RTOS_WaitSemaphore(&lcd);
   LCD_Init(false);
   LCD_Clear(LCD_GRAY);
-  LCD_DrawRectangle(ARENA_MIN_X, ARENA_MAX_X, ARENA_MIN_X, ARENA_MAX_Y,LCD_BLACK);
+  LCD_DrawRectangle(ARENA_MIN_X, ARENA_MAX_X, ARENA_MIN_Y, ARENA_MAX_Y,LCD_BLACK);
   G8RTOS_SignalSemaphore(&lcd);
 
   DrawPlayer(&gameState.players[HOST]);
