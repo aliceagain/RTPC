@@ -3,7 +3,6 @@
 
 /*********************************************** Global Vars *********************************************************************/
 GameState_t gameState;
-uint16_t ballColors[8] = {0xF81F,0x07E0,0x7FFF,0xFFE0,0xF11F,0xFD20,0xfdba,0xdfe4};
 char readjoystickName[] = "readJoystick";
 char idlethreadName[] = "idle";
 char senddatatName[] = "sendData";
@@ -192,7 +191,7 @@ void CreateGame(){
   while(ReceiveData((uint8_t * )&gameState.player, sizeof(SpecificPlayerInfo_t)) == NOTHING_RECEIVED);
   gameState.player.joined = true;
   gameState.player.acknowledge = true;
-  SendData((uint8_t * ) &gameState.player, gameState.player.IP_address, sizeof(gameState.player));
+  SendData((uint8_t * ) &gameState, gameState.player.IP_address, sizeof(gameState));
   G8RTOS_SignalSemaphore(&cc3100);
 
   P2->DIR |= RED_LED;  //p1.0 set to output
@@ -201,12 +200,12 @@ void CreateGame(){
   InitBoardState();
 
   //change priorities later
-  G8RTOS_AddThread(GenerateBall, 8, generateballName);
-  G8RTOS_AddThread(DrawObjects, 5, drawobjectsName);
-  G8RTOS_AddThread(ReadJoystickHost, 4, readjoystickName);
-  G8RTOS_AddThread(SendDataToClient, 6, senddatatName);
-  G8RTOS_AddThread(ReceiveDataFromClient, 7, receivedataName);
   G8RTOS_AddThread(MoveLEDs, 250, moveledsName);
+  G8RTOS_AddThread(GenerateBall, 8, generateballName);
+  G8RTOS_AddThread(DrawObjects, 1, drawobjectsName);
+  G8RTOS_AddThread(ReadJoystickHost, 4, readjoystickName);
+  G8RTOS_AddThread(SendDataToClient, 2, senddatatName);
+  G8RTOS_AddThread(ReceiveDataFromClient, 3, receivedataName);
   G8RTOS_AddThread(IdleThread,254,idlethreadName);
 
 
@@ -219,9 +218,26 @@ void CreateGame(){
  * Thread that sends game state to client
  */
 void SendDataToClient(){
+  int16_t outPacket[40];
   while(1){
+    G8RTOS_WaitSemaphore(&player);
+    outPacket[0] = gameState.players[0].currentCenter;
+    outPacket[1] = gameState.players[1].currentCenter;
+    for(int i = 0; i < MAX_NUM_OF_BALLS; i++){
+      outPacket[2+i*4] = gameState.balls[i].currentCenterX;
+      outPacket[3+i*4] = gameState.balls[i].currentCenterY;
+      outPacket[4+i*4] = gameState.balls[i].color;
+      outPacket[5+i*4] = gameState.balls[i].alive;
+    }
+    outPacket[34] = gameState.winner;
+    outPacket[35] = gameState.gameDone;
+    outPacket[36] = gameState.LEDScores[0];
+    outPacket[37] = gameState.LEDScores[1];
+    outPacket[38] = gameState.overallScores[0];
+    outPacket[39] = gameState.overallScores[1];
+    G8RTOS_SignalSemaphore(&player);
     G8RTOS_WaitSemaphore(&cc3100);
-    SendData((uint8_t * ) &gameState, gameState.player.IP_address, sizeof(GameState_t));
+    SendData((uint8_t * ) outPacket, gameState.player.IP_address, sizeof(int16_t)*40);
     G8RTOS_SignalSemaphore(&cc3100);
     if(gameState.gameDone){
       G8RTOS_AddThread(EndOfGameHost, 0, endofgameName);
@@ -243,12 +259,13 @@ void ReceiveDataFromClient(){
      G8RTOS_WaitSemaphore(&cc3100);
    }
    G8RTOS_SignalSemaphore(&cc3100);
+   tempDisplacement += 500;
    if(tempDisplacement < 1000 && tempDisplacement > -1000 ){
        tempDisplacement = 0;
    }
-   tempDisplacement>>=10;
+   tempDisplacement>>=11;
    G8RTOS_WaitSemaphore(&player);
-   gameState.players[CLIENT].currentCenter += tempDisplacement;
+   gameState.players[CLIENT].currentCenter += -tempDisplacement;
    if(gameState.players[CLIENT].currentCenter > HORIZ_CENTER_MAX_PL){
      gameState.players[CLIENT].currentCenter = HORIZ_CENTER_MAX_PL;
    }else if(gameState.players[CLIENT].currentCenter < HORIZ_CENTER_MIN_PL){
@@ -268,7 +285,7 @@ void GenerateBall(){
       G8RTOS_AddThread(MoveBall,100,moveballName);
       gameState.numberOfBalls++;
     }
-    sleep(100*gameState.numberOfBalls);
+    sleep(10000*gameState.numberOfBalls);
   }
 }
 
@@ -304,16 +321,17 @@ void MoveBall(){
   for(int i = 0; i < MAX_NUM_OF_BALLS; i++){
       if(!gameState.balls[i].alive){
         ball = &gameState.balls[i];
+        break;
       }
   }
   if(!ball){
     G8RTOS_KillSelf();
   }
-  ball->currentCenterX = (SystemTime-(int32_t)&ball>>2+gameState.players[CLIENT].currentCenter)%HORIZ_CENTER_MAX_BALL + HORIZ_CENTER_MIN_BALL;
-  ball->currentCenterY = (SystemTime-(int32_t)&ball>>2+gameState.players[HOST].currentCenter)%VERT_CENTER_MAX_BALL + VERT_CENTER_MIN_BALL;
-  ball->currentVelocityX = (SystemTime-(int32_t)&ball>>2+gameState.players[HOST].currentCenter)%MAX_BALL_SPEED;
-  ball->currentVelocityY = (SystemTime-(int32_t)&ball>>2+gameState.players[CLIENT].currentCenter)%MAX_BALL_SPEED;
-  ball->color = ballColors[SystemTime>>3%8];
+  ball->currentCenterX = (gameState.players[CLIENT].currentCenter)%HORIZ_CENTER_MAX_BALL + HORIZ_CENTER_MIN_BALL;
+  ball->currentCenterY = (gameState.players[HOST].currentCenter)%VERT_CENTER_MAX_BALL + VERT_CENTER_MIN_BALL;
+  ball->currentVelocityX = (gameState.players[HOST].currentCenter)%MAX_BALL_SPEED;
+  ball->currentVelocityY = (gameState.players[CLIENT].currentCenter)%MAX_BALL_SPEED;
+  ball->color = LCD_WHITE;
   ball->alive = true;
   while(1){
     ball->currentCenterX += ball->currentVelocityX;
@@ -362,10 +380,12 @@ void MoveBall(){
       case CTOP:
       case CBOTTOM:
         ball->currentVelocityY *= -1;
+        ball->color = gameState.players[CLIENT].color;
         break;
       case CRIGHT:
       case CLEFT:
-        ball->currentVelocityX *= -1;
+        ball->currentVelocityY *= -1;
+        ball->color = gameState.players[CLIENT].color;
         break;
       case CNONE:
         break;
@@ -376,10 +396,12 @@ void MoveBall(){
       case CTOP:
       case CBOTTOM:
         ball->currentVelocityY *= -1;
+        ball->color = gameState.players[HOST].color;
         break;
       case CRIGHT:
       case CLEFT:
-        ball->currentVelocityX *= -1;
+        ball->currentVelocityY *= -1;
+        ball->color = gameState.players[HOST].color;
         break;
       case CNONE:
         break;
@@ -426,8 +448,8 @@ void EndOfGameHost(){
     G8RTOS_AddThread(GenerateBall, 8, generateballName);
     G8RTOS_AddThread(DrawObjects, 5, drawobjectsName);
     G8RTOS_AddThread(ReadJoystickHost, 4, readjoystickName);
-    G8RTOS_AddThread(SendDataToClient, 7, senddatatName);
-    G8RTOS_AddThread(ReceiveDataFromClient, 6, receivedataName);
+    G8RTOS_AddThread(SendDataToClient, 2, senddatatName);
+    G8RTOS_AddThread(ReceiveDataFromClient, 3, receivedataName);
     G8RTOS_AddThread(MoveLEDs, 250, moveledsName);
     G8RTOS_AddThread(IdleThread, 254, idlethreadName);
 
@@ -665,8 +687,8 @@ void InitBoardState(){
 }
 
 collisionPosition collision(CollsionPos_t A, CollsionPos_t B){
-  int32_t w = 0.5 * (A.width + B.width);
-  int32_t h = 0.5 * (A.height + B.height);
+  int32_t h = (A.width + B.width)>>1;
+  int32_t w = (A.height + B.height)>>1;
   int32_t dx = A.centerX - B.centerX;
   int32_t dy = A.centerY - B.centerY;
 
