@@ -21,6 +21,7 @@ char moveballName[] = "MoveBall";
 void JoinGame(){
   G8RTOS_InitSemaphore(&cc3100, 1);
   G8RTOS_InitSemaphore(&lcd, 1);
+  G8RTOS_InitSemaphore(&player, 1);
   initCC3100(Client);
 
   int16_t xcoord, ycoord; //just used to initialize joystick displacement (y not necessary)
@@ -115,11 +116,13 @@ void EndOfGameClient(){
 
   G8RTOS_WaitSemaphore(&cc3100);
   G8RTOS_WaitSemaphore(&lcd);
+  G8RTOS_WaitSemaphore(&player);
 
   G8RTOS_KillOthers();
 
-  G8RTOS_SignalSemaphore(&lcd);
-  G8RTOS_SignalSemaphore(&cc3100);
+  G8RTOS_InitSemaphore(&lcd, 1);
+  G8RTOS_InitSemaphore(&cc3100, 1);
+  G8RTOS_InitSemaphore(&player, 1);
 
   G8RTOS_WaitSemaphore(&lcd);
   if(gameState.winner == HOST){
@@ -161,6 +164,7 @@ void EndOfGameClient(){
 void CreateGame(){
   G8RTOS_InitSemaphore(&cc3100, 1);
   G8RTOS_InitSemaphore(&lcd, 1);
+  G8RTOS_InitSemaphore(&player, 1);
 
   gameState.players[HOST]= (GeneralPlayerInfo_t){PADDLE_X_CENTER, PLAYER_RED, BOTTOM};
   gameState.players[CLIENT]= (GeneralPlayerInfo_t){PADDLE_X_CENTER, PLAYER_BLUE, TOP};
@@ -222,12 +226,14 @@ void ReceiveDataFromClient(){
       G8RTOS_WaitSemaphore(&cc3100);
     }
     G8RTOS_SignalSemaphore(&cc3100);
+    G8RTOS_WaitSemaphore(&player);
     gameState.players[CLIENT].currentCenter += tempDisplacement;
     if(gameState.players[CLIENT].currentCenter > HORIZ_CENTER_MAX_PL){
       gameState.players[CLIENT].currentCenter = HORIZ_CENTER_MAX_PL;
     }else if(gameState.players[CLIENT].currentCenter < HORIZ_CENTER_MIN_PL){
       gameState.players[CLIENT].currentCenter = HORIZ_CENTER_MIN_PL;
     }
+    G8RTOS_SignalSemaphore(&player);
     sleep(2);
   }
 }
@@ -238,7 +244,7 @@ void ReceiveDataFromClient(){
 void GenerateBall(){
   while(1){
     if(gameState.numberOfBalls < MAX_NUM_OF_BALLS){
-      G8RTOS_AddThread(MoveBall,0,moveballName);
+      G8RTOS_AddThread(MoveBall,100,moveballName);
       gameState.numberOfBalls++;
     }
     sleep(100*gameState.numberOfBalls);
@@ -257,12 +263,14 @@ void ReadJoystickHost(){
     }
     xcoord>>=10;
     sleep(10);
-    gameState.players[HOST].currentCenter += xcoord;
+    G8RTOS_WaitSemaphore(&player);
+    gameState.players[HOST].currentCenter += -xcoord;
     if(gameState.players[HOST].currentCenter > HORIZ_CENTER_MAX_PL){
       gameState.players[HOST].currentCenter = HORIZ_CENTER_MAX_PL;
     }else if(gameState.players[HOST].currentCenter < HORIZ_CENTER_MIN_PL){
       gameState.players[HOST].currentCenter = HORIZ_CENTER_MIN_PL;
     }
+    G8RTOS_SignalSemaphore(&player);
   }  
 }
 
@@ -372,9 +380,11 @@ char endOfGameText[] = "Press Host Button on Host to Restart Game.";
 void EndOfGameHost(){
     G8RTOS_WaitSemaphore(&cc3100);
     G8RTOS_WaitSemaphore(&lcd);
+    G8RTOS_WaitSemaphore(&player);
     G8RTOS_KillOthers();
     G8RTOS_InitSemaphore(&cc3100, 1);
     G8RTOS_InitSemaphore(&lcd, 1);
+    G8RTOS_InitSemaphore(&player, 1);
     
     G8RTOS_WaitSemaphore(&lcd);
     LCD_Clear(gameState.winner == HOST ? gameState.players[HOST].color : gameState.players[CLIENT].color);
@@ -423,7 +433,9 @@ void DrawObjects(){
   while(1){
     for(int i = 0; i < MAX_NUM_OF_PLAYERS; i++){
       if(prevPlayers[i].Center != gameState.players[i].currentCenter){
+        G8RTOS_WaitSemaphore(&player);
         UpdatePlayerOnScreen(&prevPlayers[i],&gameState.players[i]);
+        G8RTOS_SignalSemaphore(&player);
       }
     }
     for(int i = 0; i < MAX_NUM_OF_BALLS; i++){
@@ -535,13 +547,13 @@ void UpdatePlayerOnScreen(PrevPlayer_t * prevPlayerIn, GeneralPlayerInfo_t * out
       stopY = BOTTOM_PLAYER_CENTER_Y+PADDLE_WID_D2;
   }
   if(posDiff > 0 && posDiff < PADDLE_LEN_D2 ){
-      LCD_DrawRectangle(prevPlayerIn->Center+PADDLE_LEN_D2,
-                        outPlayer->currentCenter+PADDLE_LEN_D2,
+      LCD_DrawRectangle(prevPlayerIn->Center-PADDLE_LEN_D2,
+                        outPlayer->currentCenter-PADDLE_LEN_D2,
                         startY,
                         stopY,
                         BACK_COLOR);
-      LCD_DrawRectangle(prevPlayerIn->Center-PADDLE_LEN_D2,
-                        outPlayer->currentCenter-PADDLE_LEN_D2,
+      LCD_DrawRectangle(prevPlayerIn->Center+PADDLE_LEN_D2,
+                        outPlayer->currentCenter+PADDLE_LEN_D2,
                         startY,
                         stopY,
                         outPlayer->color);
