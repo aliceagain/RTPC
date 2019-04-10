@@ -255,9 +255,14 @@ void ReadJoystickHost(){
     if(xcoord < 1000 && xcoord > -1000 ){
         xcoord = 0;
     }
-    xcoord>>=9;
+    xcoord>>=10;
     sleep(10);
     gameState.players[HOST].currentCenter += xcoord;
+    if(gameState.players[HOST].currentCenter > HORIZ_CENTER_MAX_PL){
+      gameState.players[HOST].currentCenter = HORIZ_CENTER_MAX_PL;
+    }else if(gameState.players[HOST].currentCenter < HORIZ_CENTER_MIN_PL){
+      gameState.players[HOST].currentCenter = HORIZ_CENTER_MIN_PL;
+    }
   }  
 }
 
@@ -498,11 +503,19 @@ void WaitInit(){
  */
 void DrawPlayer(GeneralPlayerInfo_t * player){
   G8RTOS_WaitSemaphore(&lcd);
-  LCD_DrawRectangle(player->position-PADDLE_LEN_D2,
-                  player->position+PADDLE_LEN_D2,
-                  HORIZ_CENTER_MAX_PL-PADDLE_WID_D2,
-                  HORIZ_CENTER_MAX_PL+PADDLE_WID_D2,
-                  player->color);
+  if(player->position == TOP){
+      LCD_DrawRectangle(player->currentCenter-PADDLE_LEN_D2,
+                      player->currentCenter+PADDLE_LEN_D2,
+                      TOP_PLAYER_CENTER_Y-PADDLE_WID_D2,
+                      TOP_PLAYER_CENTER_Y+PADDLE_WID_D2,
+                      player->color);
+  }else{
+      LCD_DrawRectangle(player->currentCenter-PADDLE_LEN_D2,
+                      player->currentCenter+PADDLE_LEN_D2,
+                      BOTTOM_PLAYER_CENTER_Y-PADDLE_WID_D2,
+                      BOTTOM_PLAYER_CENTER_Y+PADDLE_WID_D2,
+                      player->color);
+  }
   G8RTOS_SignalSemaphore(&lcd);
 }
 
@@ -510,7 +523,7 @@ void DrawPlayer(GeneralPlayerInfo_t * player){
  * Updates player's paddle based on current and new center
  */
 void UpdatePlayerOnScreen(PrevPlayer_t * prevPlayerIn, GeneralPlayerInfo_t * outPlayer){
-  int16_t posDiff = outPlayer->currentCenter - prevPlayerIn->Center;
+  int16_t posDiff = prevPlayerIn->Center - outPlayer->currentCenter;
   G8RTOS_WaitSemaphore(&lcd);
   if(posDiff > 0 && posDiff < PADDLE_LEN_D2 ){
     LCD_DrawRectangle(outPlayer->currentCenter+PADDLE_LEN_D2,
@@ -524,13 +537,13 @@ void UpdatePlayerOnScreen(PrevPlayer_t * prevPlayerIn, GeneralPlayerInfo_t * out
                       HORIZ_CENTER_MAX_PL+PADDLE_WID_D2,
                       outPlayer->color);
   }else if(posDiff < 0 && posDiff > -PADDLE_LEN_D2){
-    LCD_DrawRectangle(outPlayer->currentCenter-PADDLE_LEN_D2,
-                      prevPlayerIn->Center-PADDLE_LEN_D2,
+    LCD_DrawRectangle(prevPlayerIn->Center-PADDLE_LEN_D2,
+                      outPlayer->currentCenter-PADDLE_LEN_D2,
                       HORIZ_CENTER_MAX_PL-PADDLE_WID_D2,
                       HORIZ_CENTER_MAX_PL+PADDLE_WID_D2,
                       BACK_COLOR);
-    LCD_DrawRectangle(outPlayer->currentCenter+PADDLE_LEN_D2,
-                      prevPlayerIn->Center+PADDLE_LEN_D2,
+    LCD_DrawRectangle(prevPlayerIn->Center+PADDLE_LEN_D2,
+                      outPlayer->currentCenter+PADDLE_LEN_D2,
                       HORIZ_CENTER_MAX_PL-PADDLE_WID_D2,
                       HORIZ_CENTER_MAX_PL+PADDLE_WID_D2,
                       outPlayer->color);
