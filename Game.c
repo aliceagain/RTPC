@@ -24,12 +24,10 @@ void JoinGame(){
   G8RTOS_InitSemaphore(&player, 1);
   initCC3100(Client);
 
-  int16_t xcoord, ycoord; //just used to initialize joystick displacement (y not necessary)
-  GetJoystickCoordinates(&xcoord, &ycoord);
 
   //init specific player info for client
   gameState.player.IP_address = getLocalIP();
-  gameState.player.displacement = xcoord;
+  gameState.player.displacement = 0;
   gameState.player.playerNumber = CLIENT;  //0 = client, 1 = host
   gameState.player.ready = true;
   gameState.player.joined = false;
@@ -49,11 +47,11 @@ void JoinGame(){
   InitBoardState();
 
   //change priorities later
+  G8RTOS_AddThread(IdleThread, 254, idlethreadName);
   G8RTOS_AddThread(ReadJoystickClient, 4, readjoystickName);
   G8RTOS_AddThread(SendDataToHost, 8, senddatatName);
-  G8RTOS_AddThread(ReceiveDataFromHost, 6, receivedataName);
-  G8RTOS_AddThread(DrawObjects, 5, drawobjectsName);
-  G8RTOS_AddThread(IdleThread, 254, idlethreadName);
+  G8RTOS_AddThread(ReceiveDataFromHost, 5, receivedataName);
+  G8RTOS_AddThread(DrawObjects, 6, drawobjectsName);
   G8RTOS_AddThread(MoveLEDs, 250, moveledsName);
   
   G8RTOS_KillSelf();
@@ -85,7 +83,7 @@ void ReceiveDataFromHost(){
 void SendDataToHost(){
   while(1){
     G8RTOS_WaitSemaphore(&cc3100);
-    SendData((uint8_t *)&gameState.player, HOST_IP_ADDR, sizeof(SpecificPlayerInfo_t));
+    SendData((uint8_t *)&gameState.player.displacement, HOST_IP_ADDR, sizeof(SpecificPlayerInfo_t));
     G8RTOS_SignalSemaphore(&cc3100);
     sleep(2);
   }
@@ -95,13 +93,10 @@ void SendDataToHost(){
  * Thread to read client's joystick
  */
 void ReadJoystickClient(){
-  int16_t xcoord, ycoord, xoffset, yoffset; //ycoord not needed
-  GetJoystickCoordinates(&xoffset, &yoffset); //this will get the offset ASSUMING joystick is in neutral position
+  int16_t xcoord, ycoord;
 
-  //G8RTOS_InitFIFO(JOYSTICK_CLIENTFIFO); 
   while(1){
     GetJoystickCoordinates(&xcoord, &ycoord);   //read x coord;
-    //writeFIFO(JOYSTICK_CLIENTFIFO,xcoord - xoffset);
     gameState.player.displacement = xcoord;
     sleep(10);
   }
@@ -143,8 +138,8 @@ void EndOfGameClient(){
   G8RTOS_AddThread(IdleThread, 254, idlethreadName);
   G8RTOS_AddThread(ReadJoystickClient, 4, readjoystickName);
   G8RTOS_AddThread(SendDataToHost, 8, senddatatName);
-  G8RTOS_AddThread(ReceiveDataFromHost, 6, receivedataName);
-  G8RTOS_AddThread(DrawObjects, 5, drawobjectsName);
+  G8RTOS_AddThread(ReceiveDataFromHost, 5, receivedataName);
+  G8RTOS_AddThread(DrawObjects, 6, drawobjectsName);
   G8RTOS_AddThread(MoveLEDs, 250, moveledsName);
 
   //reset game variables ***
@@ -638,7 +633,7 @@ void InitBoardState(){
   G8RTOS_WaitSemaphore(&lcd);
   LCD_Init(false);
   LCD_Clear(LCD_GRAY);
-  LCD_DrawRectangle(ARENA_MIN_X, ARENA_MAX_X, ARENA_MIN_X, ARENA_MAX_Y,LCD_BLACK);
+  LCD_DrawRectangle(ARENA_MIN_X, ARENA_MAX_X, ARENA_MIN_Y, ARENA_MAX_Y,LCD_BLACK);
   G8RTOS_SignalSemaphore(&lcd);
 
   DrawPlayer(&gameState.players[HOST]);
