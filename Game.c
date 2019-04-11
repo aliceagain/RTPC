@@ -272,7 +272,7 @@ void ReceiveDataFromClient(){
    if(tempDisplacement < 1000 && tempDisplacement > -1000 ){
        tempDisplacement = 0;
    }
-   tempDisplacement>>=10;
+   tempDisplacement>>=11;
    G8RTOS_WaitSemaphore(&player);
    gameState.players[CLIENT].currentCenter += -tempDisplacement;
    if(gameState.players[CLIENT].currentCenter > HORIZ_CENTER_MAX_PL){
@@ -467,8 +467,8 @@ void MoveBall(){
 bool restart = false;
 void EndofGameButtonHandler(){
   restart = true;
+  P4->IFG &= ~BIT4;
   P4->IE &= ~BIT4;
-  P4->IFG &= ~BIT4;  
 }
 
 /*
