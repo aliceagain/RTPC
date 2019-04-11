@@ -1,7 +1,7 @@
 /Debug/
 RemoteSystemsTempFiles
 .metadata
-
+.cproject
 # Prerequisites
 *.d
 
