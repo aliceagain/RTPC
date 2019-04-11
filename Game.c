@@ -96,7 +96,7 @@ void ReceiveDataFromHost(){
     if(gameState.gameDone == true){
       G8RTOS_AddThread(EndOfGameClient, 0, endofgameName);
     }
-    sleep(5);
+    sleep(2);
   }
 }
 
