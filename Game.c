@@ -1,6 +1,6 @@
 #include "Game.h"
 #include "BSP.h"
-
+#include "stdio.h"
 /*********************************************** Global Vars *********************************************************************/
 GameState_t gameState;
 char readjoystickName[] = "readJoystick";
@@ -12,6 +12,8 @@ char moveledsName[] = "MoveLEDs";
 char endofgameName[] = "EndofGame";
 char generateballName[] = "GenerateBall";
 char moveballName[] = "MoveBall";
+char scoreClient[] = "0";
+char scoreHost[] = "0";
 
 /*********************************************** Client Threads *********************************************************************/
 /*
@@ -394,6 +396,10 @@ void MoveBall(){
           ball->currentVelocityY *= -1;
       }else{
           gameState.LEDScores[CLIENT] |= 0x10<<gameState.overallScores[CLIENT]++;
+          G8RTOS_WaitSemaphore(&lcd);
+          sprintf(scoreClient, "%d",gameState.overallScores[CLIENT]);
+          LCD_Text(0, 0, (uint8_t*)scoreClient, LCD_WHITE);
+          G8RTOS_SignalSemaphore(&lcd);
           if(gameState.overallScores[CLIENT] == 4){
             gameState.winner = CLIENT;
             gameState.gameDone = true;
@@ -414,6 +420,9 @@ void MoveBall(){
           ball->currentVelocityY *= -1;
       }else{
           gameState.LEDScores[HOST] |= 0xF>>gameState.overallScores[HOST]++;
+          sprintf(scoreClient, "%d",gameState.overallScores[HOST]);
+          LCD_Text(0, 220, (uint8_t*)scoreHost, LCD_WHITE);
+          G8RTOS_SignalSemaphore(&lcd);
           if(gameState.overallScores[HOST] == 4){
             gameState.winner = HOST;
             gameState.gameDone = true;
