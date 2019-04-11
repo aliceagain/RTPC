@@ -221,7 +221,7 @@ sched_ErrCode_t G8RTOS_AddThread(void (*threadToAdd)(void), uint8_t priority, ch
         threadStacks[tcbToInitialize][STACKSIZE-1] = THUMBBIT;
         threadStacks[tcbToInitialize][STACKSIZE-2] = (uint32_t) threadToAdd;
 
-        if(tcbToInitialize == 0){
+        if(NumberOfThreads == 0){
 
             threadControlBlocks[tcbToInitialize].next = &threadControlBlocks[tcbToInitialize];
             threadControlBlocks[tcbToInitialize].prev = &threadControlBlocks[tcbToInitialize];

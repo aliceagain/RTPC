@@ -50,7 +50,7 @@ void JoinGame(){
   //change priorities later
 
   G8RTOS_AddThread(MoveLEDs, 250, moveledsName);
-  G8RTOS_AddThread(DrawObjects, 6, drawobjectsName);
+  G8RTOS_AddThread(DrawObjects, 1, drawobjectsName);
   G8RTOS_AddThread(ReadJoystickClient, 2, readjoystickName);
   G8RTOS_AddThread(SendDataToHost, 5, senddatatName);
   G8RTOS_AddThread(ReceiveDataFromHost, 4, receivedataName);
@@ -96,7 +96,7 @@ void ReceiveDataFromHost(){
     if(gameState.gameDone == true){
       G8RTOS_AddThread(EndOfGameClient, 0, endofgameName);
     }
-    sleep(5);
+    sleep(2);
   }
 }
 
@@ -152,17 +152,22 @@ void EndOfGameClient(){
   G8RTOS_SignalSemaphore(&lcd);
 
   G8RTOS_WaitSemaphore(&cc3100);
-  while(ReceiveData((uint8_t *)&gameState, sizeof(GameState_t)) <= 0);  //** CHECK: wait for new game state to see if restart?
+  while(ReceiveData((uint8_t *)&gameState, sizeof(gameState)) == NOTHING_RECEIVED);  //** CHECK: wait for new game state to see if restart?
   G8RTOS_SignalSemaphore(&cc3100);
 
   InitBoardState(); //re-init board state
+  gameState.player.ready = true;
+  G8RTOS_WaitSemaphore(&cc3100);
+  SendData((uint8_t * ) &gameState.player.ready, HOST_IP_ADDR, sizeof(gameState.player.ready)); //send ready ack to host
+  G8RTOS_SignalSemaphore(&cc3100);
 
   //re-add threads
+
   G8RTOS_AddThread(MoveLEDs, 250, moveledsName);
-  G8RTOS_AddThread(DrawObjects, 5, drawobjectsName);
+  G8RTOS_AddThread(DrawObjects, 1, drawobjectsName);
   G8RTOS_AddThread(ReadJoystickClient, 2, readjoystickName);
-  G8RTOS_AddThread(SendDataToHost, 4, senddatatName);
-  G8RTOS_AddThread(ReceiveDataFromHost, 3, receivedataName);
+  G8RTOS_AddThread(SendDataToHost, 5, senddatatName);
+  G8RTOS_AddThread(ReceiveDataFromHost, 4, receivedataName);
   G8RTOS_AddThread(IdleThread, 254, idlethreadName);
 
   //reset game variables ***
@@ -394,15 +399,20 @@ void MoveBall(){
     if(ball->currentCenterY > VERT_CENTER_MAX_BALL){
       if(ball->color == LCD_WHITE){
           ball->currentVelocityY *= -1;
+
       }else{
-          gameState.LEDScores[CLIENT] |= 0x10<<gameState.overallScores[CLIENT]++;
-          G8RTOS_WaitSemaphore(&lcd);
-          sprintf(scoreClient, "%d",gameState.overallScores[CLIENT]);
-          LCD_Text(0, 0, (uint8_t*)scoreClient, LCD_WHITE);
-          G8RTOS_SignalSemaphore(&lcd);
-          if(gameState.overallScores[CLIENT] == 4){
+          //gameState.LEDScores[CLIENT] |= 0x10<<gameState.overallScores[CLIENT]++;
+          if(gameState.LEDScores[CLIENT] == 0){
+              gameState.LEDScores[CLIENT] = 1;
+          }
+          else{
+              gameState.LEDScores[CLIENT] |= (gameState.LEDScores[CLIENT] << 1);
+          }
+
+          if(gameState.LEDScores[CLIENT] == 0x0F){
             gameState.winner = CLIENT;
             gameState.gameDone = true;
+            gameState.overallScores[CLIENT]++;  //increase number of game wins
           }
           G8RTOS_WaitSemaphore(&lcd);
           LCD_DrawRectangle(ball->currentCenterX-BALL_SIZE_D2,
@@ -418,14 +428,20 @@ void MoveBall(){
     if(ball->currentCenterY < VERT_CENTER_MIN_BALL){
       if(ball->color == LCD_WHITE){
           ball->currentVelocityY *= -1;
+
       }else{
-          gameState.LEDScores[HOST] |= 0xF>>gameState.overallScores[HOST]++;
-          sprintf(scoreClient, "%d",gameState.overallScores[HOST]);
-          LCD_Text(0, 220, (uint8_t*)scoreHost, LCD_WHITE);
-          G8RTOS_SignalSemaphore(&lcd);
-          if(gameState.overallScores[HOST] == 4){
+          //gameState.LEDScores[HOST] |= 0xF>>gameState.overallScores[HOST]++;
+          if(gameState.LEDScores[HOST] == 0){
+              gameState.LEDScores[HOST] = 128;    //msb set
+          }
+          else{
+              gameState.LEDScores[HOST] |= (gameState.LEDScores[HOST] >> 1);
+          }
+
+          if(gameState.LEDScores[HOST] == 0xF0){
             gameState.winner = HOST;
             gameState.gameDone = true;
+            gameState.overallScores[HOST]++;
           }
           G8RTOS_WaitSemaphore(&lcd);
           LCD_DrawRectangle(ball->currentCenterX-BALL_SIZE_D2,
@@ -472,8 +488,13 @@ void EndOfGameHost(){
     restart = false;
 
     InitBoardState();
+    gameState.player.ready = false; //reset client ready to false
     G8RTOS_WaitSemaphore(&cc3100);
     SendData((uint8_t * ) &gameState, gameState.player.IP_address, sizeof(gameState));
+    G8RTOS_SignalSemaphore(&cc3100);
+
+    G8RTOS_WaitSemaphore(&cc3100);
+    while(ReceiveData((uint8_t *)&gameState.player.ready, sizeof(gameState.player.ready)) == NOTHING_RECEIVED);  //wait for ack from client
     G8RTOS_SignalSemaphore(&cc3100);
 
     //change priorities later
@@ -528,7 +549,7 @@ void DrawObjects(){
 void MoveLEDs(){
   while(1){
     LP3943_LedModeSet(RED,gameState.LEDScores[HOST]);
-    LP3943_LedModeSet(BLUE,gameState.LEDScores[CLIENT]);
+    LP3943_LedModeSet(BLUE,((uint16_t)gameState.LEDScores[CLIENT]) << 8);
     sleep(10);
   }
 }
@@ -613,7 +634,6 @@ void DrawPlayer(GeneralPlayerInfo_t * player){
  */
 void UpdatePlayerOnScreen(PrevPlayer_t * prevPlayerIn, GeneralPlayerInfo_t * outPlayer){
   int16_t posDiff = outPlayer->currentCenter - prevPlayerIn->Center;
-  G8RTOS_WaitSemaphore(&lcd);
   int16_t startY;
   int16_t stopY;
   if(outPlayer->position == TOP){
@@ -623,6 +643,7 @@ void UpdatePlayerOnScreen(PrevPlayer_t * prevPlayerIn, GeneralPlayerInfo_t * out
       startY = BOTTOM_PLAYER_CENTER_Y-PADDLE_WID_D2;
       stopY = BOTTOM_PLAYER_CENTER_Y+PADDLE_WID_D2;
   }
+  G8RTOS_WaitSemaphore(&lcd);
   if(posDiff > 0 && posDiff < PADDLE_LEN_D2 ){
       LCD_DrawRectangle(prevPlayerIn->Center-PADDLE_LEN_D2,
                         outPlayer->currentCenter-PADDLE_LEN_D2,
@@ -705,7 +726,7 @@ void InitBoardState(){
   gameState.numberOfBalls = 0;
   for(int i = 0; i < MAX_NUM_OF_PLAYERS; i++){
     gameState.LEDScores[i] = 0;
-    gameState.overallScores[i] = 0;
+    //gameState.overallScores[i] = 0;
   }
 
   G8RTOS_WaitSemaphore(&lcd);
@@ -716,6 +737,16 @@ void InitBoardState(){
 
   DrawPlayer(&gameState.players[HOST]);
   DrawPlayer(&gameState.players[CLIENT]);
+
+  G8RTOS_WaitSemaphore(&lcd);
+  sprintf(scoreHost, "%d",gameState.overallScores[HOST]);
+  LCD_Text(0, 220, (uint8_t*)scoreHost, LCD_WHITE);
+  G8RTOS_SignalSemaphore(&lcd);
+
+  G8RTOS_WaitSemaphore(&lcd);
+  sprintf(scoreClient, "%d",gameState.overallScores[CLIENT]);
+  LCD_Text(0, 0, (uint8_t*)scoreClient, LCD_WHITE);
+  G8RTOS_SignalSemaphore(&lcd);
 }
 
 inline int32_t abs(int32_t x){
