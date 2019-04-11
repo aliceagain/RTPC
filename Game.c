@@ -149,26 +149,6 @@ void EndOfGameClient(){
   }
   G8RTOS_SignalSemaphore(&lcd);
 
-  G8RTOS_WaitSemaphore(&cc3100);
-  while(ReceiveData((uint8_t *)&gameState, sizeof(gameState)) == NOTHING_RECEIVED);  //** CHECK: wait for new game state to see if restart?
-  G8RTOS_SignalSemaphore(&cc3100);
-
-  InitBoardState(); //re-init board state
-  gameState.player.ready = true;
-  G8RTOS_WaitSemaphore(&cc3100);
-  SendData((uint8_t * ) &gameState.player.ready, HOST_IP_ADDR, sizeof(gameState.player.ready)); //send ready ack to host
-  G8RTOS_SignalSemaphore(&cc3100);
-
-  //re-add threads
-
-  G8RTOS_AddThread(DrawObjects, 1, drawobjectsName);
-  G8RTOS_AddThread(ReadJoystickClient, 2, readjoystickName);
-  G8RTOS_AddThread(SendDataToHost, 5, senddatatName);
-  G8RTOS_AddThread(ReceiveDataFromHost, 4, receivedataName);
-  G8RTOS_AddThread(IdleThread, 254, idlethreadName);
-
-  //reset game variables ***
-
   G8RTOS_KillSelf();
 
 
@@ -185,6 +165,8 @@ void CreateGame(){
   G8RTOS_InitSemaphore(&cc3100, 1);
   G8RTOS_InitSemaphore(&lcd, 1);
   G8RTOS_InitSemaphore(&player, 1);
+  G8RTOS_InitFIFO(HOST);
+  G8RTOS_InitFIFO(CLIENT);
 
   G8RTOS_WaitSemaphore(&cc3100);
   initCC3100(Host);
@@ -292,7 +274,9 @@ void ReceiveDataFromClient(){
      gameState.players[CLIENT].headY %= 240;
    }
    G8RTOS_SignalSemaphore(&player);
-    sleep(2);
+   writeFIFO(CLIENT,gameState.players[CLIENT].headX);
+   writeFIFO(CLIENT,gameState.players[CLIENT].headY);
+   sleep(2);
   }
 }
 
@@ -338,6 +322,8 @@ void ReadJoystickHost(){
       gameState.players[HOST].headY %= 240;
     }
     G8RTOS_SignalSemaphore(&player);
+    writeFIFO(HOST,gameState.players[HOST].headX);
+    writeFIFO(HOST,gameState.players[HOST].headY);
   }  
 }
 
@@ -369,27 +355,7 @@ void EndOfGameHost(){
     LCD_Clear(gameState.winner == HOST ? gameState.players[HOST].color : gameState.players[CLIENT].color);
     LCD_Text(20,100,(uint8_t*)endOfGameText,LCD_BLACK);
     G8RTOS_SignalSemaphore(&lcd);
-    P4->IE |= BIT4;
-    G8RTOS_AddAPeriodicEvent(EndofGameButtonHandler,6,PORT4_IRQn);
-    while(!restart);
-    restart = false;
-
-    InitBoardState();
-    gameState.player.ready = false; //reset client ready to false
-    G8RTOS_WaitSemaphore(&cc3100);
-    SendData((uint8_t * ) &gameState, gameState.player.IP_address, sizeof(gameState));
-    G8RTOS_SignalSemaphore(&cc3100);
-
-    G8RTOS_WaitSemaphore(&cc3100);
-    while(ReceiveData((uint8_t *)&gameState.player.ready, sizeof(gameState.player.ready)) == NOTHING_RECEIVED);  //wait for ack from client
-    G8RTOS_SignalSemaphore(&cc3100);
-
-    //change priorities later
-    G8RTOS_AddThread(DrawObjects, 1, drawobjectsName);
-    G8RTOS_AddThread(ReadJoystickHost, 4, readjoystickName);
-    G8RTOS_AddThread(SendDataToClient, 2, senddatatName);
-    G8RTOS_AddThread(ReceiveDataFromClient, 3, receivedataName);
-    G8RTOS_AddThread(IdleThread,254,idlethreadName);
+    
 
     G8RTOS_KillSelf();
 }
@@ -416,6 +382,10 @@ void DrawObjects(){
     for(int i = 0; i < MAX_NUM_OF_PLAYERS; i++){
       if(prevPlayers[i].headX != gameState.players[i].headX || prevPlayers[i].headY != gameState.players[i].headY){  //if player has moved
         G8RTOS_WaitSemaphore(&player);
+        int16_t tempX = readFIFO(i);
+        int16_t tempY = readFIFO(i);
+        gameState.players[i].tailX = tempX;
+        gameState.players[i].tailY = tempY;
         UpdatePlayerOnScreen(&prevPlayers[i],&gameState.players[i]);
         G8RTOS_SignalSemaphore(&player);
       }
@@ -520,6 +490,10 @@ void InitBoardState(){
   gameState.players[CLIENT]= (GeneralPlayerInfo_t){200, 200, 0, 0, LCD_BLUE};
   gameState.winner = 0;
   gameState.gameDone = false;
+  writeFIFO(HOST, 100);
+  writeFIFO(HOST, 100);
+  writeFIFO(CLIENT, 200);
+  writeFIFO(CLIENT, 200);
   // for(int i = 0; i < MAX_NUM_OF_PLAYERS; i++){
   //   gameState.LEDScores[i] = 0;
   //   //gameState.overallScores[i] = 0;

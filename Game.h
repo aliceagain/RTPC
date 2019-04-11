@@ -13,6 +13,7 @@
 #include <stdint.h>
 #include "G8RTOS/G8RTOS.h"
 #include "cc3100_usage.h"
+#include <G8RTOS_IPC.h>
 #include "LCDLib.h"
 /*********************************************** Includes ********************************************************************/
 
