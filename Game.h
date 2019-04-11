@@ -98,6 +98,12 @@ semaphore_t player;
 #define JOYSTICK_CLIENTFIFO CLIENT
 #define JOYSTICK_HOSTFIFO HOST
 
+/* Used for starting position of snakes */
+#define SNAKESTART_CLIENTX 60
+#define SNAKESTART_HOSTX 260
+#define SNAKESTART_Y 120
+
+
 /* Enums for player colors */
 typedef enum
 {
@@ -133,7 +139,7 @@ typedef struct
 {
     uint32_t IP_address;
     int16_t displacementX;
-    int16-t displacementY;
+    int16_t displacementY;
     uint8_t playerNumber;
     bool ready;
     bool joined;
@@ -189,7 +195,8 @@ typedef struct
  */
 typedef struct
 {
-    int16_t Center;
+    int16_t headX;
+    int16_t headY;
 }PrevPlayer_t;
 
 typedef struct{
