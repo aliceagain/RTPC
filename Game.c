@@ -132,6 +132,8 @@ void ReadJoystickClient(){
  */
 void EndOfGameClient(){
 
+  LP3943_LedModeSet(BLUE,((uint16_t)gameState.LEDScores[CLIENT]) << 8);
+
   G8RTOS_WaitSemaphore(&cc3100);
   G8RTOS_WaitSemaphore(&lcd);
   G8RTOS_WaitSemaphore(&player);
@@ -502,7 +504,7 @@ void EndOfGameHost(){
     G8RTOS_SignalSemaphore(&cc3100);
 
     //change priorities later
-    G8RTOS_AddThread(MoveLEDs, 250, moveledsName);
+    G8RTOS_AddThread(MoveLEDs, 5, moveledsName);
     G8RTOS_AddThread(GenerateBall, 8, generateballName);
     G8RTOS_AddThread(DrawObjects, 1, drawobjectsName);
     G8RTOS_AddThread(ReadJoystickHost, 4, readjoystickName);
@@ -749,7 +751,7 @@ void InitBoardState(){
 
   G8RTOS_WaitSemaphore(&lcd);
   sprintf(scoreClient, "%d",gameState.overallScores[CLIENT]);
-  LCD_Text(0, 20, (uint8_t*)scoreClient, LCD_WHITE);
+  LCD_Text(0, 10, (uint8_t*)scoreClient, LCD_WHITE);
   G8RTOS_SignalSemaphore(&lcd);
 }
 
