@@ -26,7 +26,6 @@ semaphore_t player;
 /*********************************************** Externs ********************************************************************/
 
 /*********************************************** Global Defines ********************************************************************/
-#define abs(x) x < 0 ? -x : x
 
 #define MAX_NUM_OF_PLAYERS  2
 #define MAX_NUM_OF_BALLS    8
@@ -198,8 +197,8 @@ typedef struct
 }PrevPlayer_t;
 
 typedef struct{
-    int16_t width;
     int16_t height;
+    int16_t width;
     int16_t centerX;
     int16_t centerY;
 }CollsionPos_t;

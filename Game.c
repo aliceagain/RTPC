@@ -264,7 +264,7 @@ void ReceiveDataFromClient(){
    if(tempDisplacement < 1000 && tempDisplacement > -1000 ){
        tempDisplacement = 0;
    }
-   tempDisplacement>>=11;
+   tempDisplacement>>=10;
    G8RTOS_WaitSemaphore(&player);
    gameState.players[CLIENT].currentCenter += -tempDisplacement;
    if(gameState.players[CLIENT].currentCenter > HORIZ_CENTER_MAX_PL){
@@ -286,7 +286,7 @@ void GenerateBall(){
       G8RTOS_AddThread(MoveBall,100,moveballName);
       gameState.numberOfBalls++;
     }
-    sleep(10000*gameState.numberOfBalls);
+    sleep(4000-gameState.numberOfBalls*250);
   }
 }
 
@@ -328,15 +328,60 @@ void MoveBall(){
   if(!ball){
     G8RTOS_KillSelf();
   }
-  ball->currentCenterX = (gameState.players[CLIENT].currentCenter)%HORIZ_CENTER_MAX_BALL + HORIZ_CENTER_MIN_BALL;
-  ball->currentCenterY = (gameState.players[HOST].currentCenter)%VERT_CENTER_MAX_BALL + VERT_CENTER_MIN_BALL;
-  ball->currentVelocityX = (gameState.players[HOST].currentCenter)%MAX_BALL_SPEED;
-  ball->currentVelocityY = (gameState.players[CLIENT].currentCenter)%MAX_BALL_SPEED;
+  ball->currentCenterX = (SystemTime+gameState.players[CLIENT].currentCenter)%HORIZ_CENTER_MAX_BALL + HORIZ_CENTER_MIN_BALL;
+  ball->currentCenterY = (SystemTime+gameState.players[HOST].currentCenter)%VERT_CENTER_MAX_BALL + VERT_CENTER_MIN_BALL;
+  ball->currentVelocityX = (gameState.players[HOST].currentCenter)%MAX_BALL_SPEED > 3 ? -1 : 1;
+  ball->currentVelocityY = (gameState.players[CLIENT].currentCenter)%MAX_BALL_SPEED > 3 ? -1 : 1;
   ball->color = LCD_WHITE;
   ball->alive = true;
   while(1){
     ball->currentCenterX += ball->currentVelocityX;
     ball->currentCenterY += ball->currentVelocityY;
+    switch (collision((CollsionPos_t){PADDLE_WID,PADDLE_LEN+WIGGLE_ROOM,gameState.players[CLIENT].currentCenter,TOP_PLAYER_CENTER_Y},
+                      (CollsionPos_t){BALL_SIZE,BALL_SIZE,ball->currentCenterX,ball->currentCenterY})){
+      case CTOP:
+        break;
+      case CBOTTOM:
+        ball->currentVelocityY *= -1;
+        ball->currentVelocityX = ball->currentVelocityX == 0 ? 1 : ball->currentVelocityX;
+        ball->color = gameState.players[CLIENT].color;
+        break;
+      case CRIGHT:
+        ball->currentVelocityY *= -1;
+        ball->currentVelocityX += ball->currentVelocityX < MAX_BALL_SPEED ? 1 : 0;
+        ball->color = gameState.players[CLIENT].color;
+        break;
+      case CLEFT:
+        ball->currentVelocityY *= -1;
+        ball->currentVelocityX -= ball->currentVelocityX < MAX_BALL_SPEED ? 1 : 0;
+        ball->color = gameState.players[CLIENT].color;
+        break;
+      case CNONE:
+        break;
+    }
+
+    switch (collision((CollsionPos_t){PADDLE_WID,PADDLE_LEN+WIGGLE_ROOM,gameState.players[HOST].currentCenter,BOTTOM_PLAYER_CENTER_Y},
+                      (CollsionPos_t){BALL_SIZE,BALL_SIZE,ball->currentCenterX,ball->currentCenterY})){
+    case CTOP:
+      ball->currentVelocityY *= -1;
+      ball->currentVelocityX = ball->currentVelocityX == 0 ? 1 : ball->currentVelocityX;
+      ball->color = gameState.players[HOST].color;
+      break;
+    case CBOTTOM:
+      break;
+    case CRIGHT:
+      ball->currentVelocityY *= -1;
+      ball->currentVelocityX += ball->currentVelocityX < MAX_BALL_SPEED ? 1 : 0;
+      ball->color = gameState.players[HOST].color;
+      break;
+    case CLEFT:
+      ball->currentVelocityY *= -1;
+      ball->currentVelocityX -= ball->currentVelocityX < MAX_BALL_SPEED ? 1 : 0;
+      ball->color = gameState.players[HOST].color;
+      break;
+      case CNONE:
+        break;
+    }
     if(ball->currentCenterX > HORIZ_CENTER_MAX_BALL){
       ball->currentVelocityX *= -1;
       ball->currentCenterX = HORIZ_CENTER_MAX_BALL;
@@ -346,68 +391,45 @@ void MoveBall(){
       ball->currentCenterX = HORIZ_CENTER_MIN_BALL;
     }
     if(ball->currentCenterY > VERT_CENTER_MAX_BALL){
-      gameState.LEDScores[CLIENT] |= 0x10<<gameState.overallScores[CLIENT]++;
-      if(gameState.overallScores[CLIENT] == 4){
-        gameState.winner = CLIENT;
-        gameState.gameDone = true;
+      if(ball->color == LCD_WHITE){
+          ball->currentVelocityY *= -1;
+      }else{
+          gameState.LEDScores[CLIENT] |= 0x10<<gameState.overallScores[CLIENT]++;
+          if(gameState.overallScores[CLIENT] == 4){
+            gameState.winner = CLIENT;
+            gameState.gameDone = true;
+          }
+          G8RTOS_WaitSemaphore(&lcd);
+          LCD_DrawRectangle(ball->currentCenterX-BALL_SIZE_D2,
+                            ball->currentCenterX+BALL_SIZE_D2,
+                            ball->currentCenterY-BALL_SIZE_D2,
+                            ball->currentCenterY+BALL_SIZE_D2,
+                            LCD_BLACK);
+          G8RTOS_SignalSemaphore(&lcd);
+          gameState.numberOfBalls--;
+          G8RTOS_KillSelf();
       }
-      G8RTOS_WaitSemaphore(&lcd);
-      LCD_DrawRectangle(ball->currentCenterX-BALL_SIZE_D2,
-                        ball->currentCenterX+BALL_SIZE_D2,
-                        ball->currentCenterY-BALL_SIZE_D2,
-                        ball->currentCenterY+BALL_SIZE_D2,
-                        LCD_BLACK);
-      G8RTOS_SignalSemaphore(&lcd);
-      G8RTOS_KillSelf();
     }
     if(ball->currentCenterY < VERT_CENTER_MIN_BALL){
-      gameState.LEDScores[HOST] |= 0xF>>gameState.overallScores[HOST]++;
-      if(gameState.overallScores[HOST] == 4){
-        gameState.winner = HOST;
-        gameState.gameDone = true;
+      if(ball->color == LCD_WHITE){
+          ball->currentVelocityY *= -1;
+      }else{
+          gameState.LEDScores[HOST] |= 0xF>>gameState.overallScores[HOST]++;
+          if(gameState.overallScores[HOST] == 4){
+            gameState.winner = HOST;
+            gameState.gameDone = true;
+          }
+          G8RTOS_WaitSemaphore(&lcd);
+          LCD_DrawRectangle(ball->currentCenterX-BALL_SIZE_D2,
+                            ball->currentCenterX+BALL_SIZE_D2,
+                            ball->currentCenterY-BALL_SIZE_D2,
+                            ball->currentCenterY+BALL_SIZE_D2,
+                            LCD_BLACK);
+          G8RTOS_SignalSemaphore(&lcd);
+          gameState.numberOfBalls--;
+          G8RTOS_KillSelf();
       }
-      G8RTOS_WaitSemaphore(&lcd);
-      LCD_DrawRectangle(ball->currentCenterX-BALL_SIZE_D2,
-                        ball->currentCenterX+BALL_SIZE_D2,
-                        ball->currentCenterY-BALL_SIZE_D2,
-                        ball->currentCenterY+BALL_SIZE_D2,
-                        LCD_BLACK);
-      G8RTOS_SignalSemaphore(&lcd);
-      G8RTOS_KillSelf();
     }
-
-    switch (collision((CollsionPos_t){PADDLE_WID,PADDLE_LEN+WIGGLE_ROOM,gameState.players[CLIENT].currentCenter,TOP_PLAYER_CENTER_Y},
-                      (CollsionPos_t){BALL_SIZE,BALL_SIZE,ball->currentCenterX,ball->currentCenterY})){
-      case CTOP:
-      case CBOTTOM:
-        ball->currentVelocityY *= -1;
-        ball->color = gameState.players[CLIENT].color;
-        break;
-      case CRIGHT:
-      case CLEFT:
-        ball->currentVelocityY *= -1;
-        ball->color = gameState.players[CLIENT].color;
-        break;
-      case CNONE:
-        break;
-    }
-
-    switch (collision((CollsionPos_t){PADDLE_WID,PADDLE_LEN+WIGGLE_ROOM,gameState.players[CLIENT].currentCenter,BOTTOM_PLAYER_CENTER_Y},
-                      (CollsionPos_t){BALL_SIZE,BALL_SIZE,ball->currentCenterX,ball->currentCenterY})){
-      case CTOP:
-      case CBOTTOM:
-        ball->currentVelocityY *= -1;
-        ball->color = gameState.players[HOST].color;
-        break;
-      case CRIGHT:
-      case CLEFT:
-        ball->currentVelocityY *= -1;
-        ball->color = gameState.players[HOST].color;
-        break;
-      case CNONE:
-        break;
-    }
-
     sleep(35);
   }
 }
@@ -415,6 +437,7 @@ void MoveBall(){
 bool restart = false;
 void EndofGameButtonHandler(){
   restart = true;
+  P4->IE &= ~BIT4;
   P4->IFG &= ~BIT4;  
 }
 
@@ -446,13 +469,13 @@ void EndOfGameHost(){
     G8RTOS_SignalSemaphore(&cc3100);
 
     //change priorities later
+    G8RTOS_AddThread(MoveLEDs, 250, moveledsName);
     G8RTOS_AddThread(GenerateBall, 8, generateballName);
-    G8RTOS_AddThread(DrawObjects, 5, drawobjectsName);
+    G8RTOS_AddThread(DrawObjects, 1, drawobjectsName);
     G8RTOS_AddThread(ReadJoystickHost, 4, readjoystickName);
     G8RTOS_AddThread(SendDataToClient, 2, senddatatName);
     G8RTOS_AddThread(ReceiveDataFromClient, 3, receivedataName);
-    G8RTOS_AddThread(MoveLEDs, 250, moveledsName);
-    G8RTOS_AddThread(IdleThread, 254, idlethreadName);
+    G8RTOS_AddThread(IdleThread,254,idlethreadName);
 
     G8RTOS_KillSelf();
 }
@@ -687,9 +710,13 @@ void InitBoardState(){
   DrawPlayer(&gameState.players[CLIENT]);
 }
 
+inline int32_t abs(int32_t x){
+  return x < 0 ? -x : x;
+}
+
 collisionPosition collision(CollsionPos_t A, CollsionPos_t B){
-  int32_t h = (A.width + B.width)>>1;
-  int32_t w = (A.height + B.height)>>1;
+  int32_t w = (A.width + B.width)>>1;
+  int32_t h = (A.height + B.height)>>1;
   int32_t dx = A.centerX - B.centerX;
   int32_t dy = A.centerY - B.centerY;
 
