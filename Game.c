@@ -749,7 +749,7 @@ void InitBoardState(){
 
   G8RTOS_WaitSemaphore(&lcd);
   sprintf(scoreClient, "%d",gameState.overallScores[CLIENT]);
-  LCD_Text(0, 0, (uint8_t*)scoreClient, LCD_WHITE);
+  LCD_Text(0, 20, (uint8_t*)scoreClient, LCD_WHITE);
   G8RTOS_SignalSemaphore(&lcd);
 }
 
