@@ -158,6 +158,8 @@ typedef struct
     int16_t tailX;
     int16_t tailY;
     uint16_t color;
+    int16_t size;
+    int16_t currentSize;
 } GeneralPlayerInfo_t;
 
 /*

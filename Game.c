@@ -167,7 +167,14 @@ void CreateGame(){
   G8RTOS_InitSemaphore(&player, 1);
   G8RTOS_InitFIFO(HOST);
   G8RTOS_InitFIFO(CLIENT);
-
+  gameState.players[HOST]= (GeneralPlayerInfo_t){100, 100, 0, 0, LCD_RED, 1, 0};
+  gameState.players[CLIENT]= (GeneralPlayerInfo_t){200, 200, 0, 0, LCD_BLUE, 1, 0};
+  gameState.winner = 0;
+  gameState.gameDone = false;
+  writeFIFO(HOST, gameState.players[HOST].headX);
+  writeFIFO(HOST, gameState.players[HOST].headY);
+  writeFIFO(HOST, gameState.players[CLIENT].headX);
+  writeFIFO(HOST, gameState.players[CLIENT].headY);
   G8RTOS_WaitSemaphore(&cc3100);
   initCC3100(Host);
 
@@ -230,8 +237,8 @@ void SendDataToClient(){
  */
 void ReceiveDataFromClient(){
   int16_t tempDisplacement[2];
-  int16_t velocityX;
-  int16_t velocityY;
+  int16_t velocityX = 1;
+  int16_t velocityY = 0;
   while(1){
    G8RTOS_WaitSemaphore(&cc3100);
    while(ReceiveData((uint8_t * )&tempDisplacement, sizeof(int16_t)*2) == NOTHING_RECEIVED){
@@ -285,7 +292,8 @@ void ReceiveDataFromClient(){
  */
 void ReadJoystickHost(){
   int16_t xcoord, ycoord; //ycoord not needed
-  int16_t velocityX, velocityY;
+  int16_t velocityX = 0;
+  int16_t velocityY = 1;
   while(1){
     GetJoystickCoordinates(&xcoord, &ycoord);   //read x coord;
     if(!((xcoord > 3000 || xcoord < -3000)&&(ycoord > 3000 || ycoord < -3000))){
@@ -468,15 +476,19 @@ void DrawPlayer(GeneralPlayerInfo_t * player){
  */
 void UpdatePlayerOnScreen(PrevPlayer_t * prev, GeneralPlayerInfo_t * player){
   G8RTOS_WaitSemaphore(&lcd);
+  if(player->currentSize < player->size){
+      player->currentSize++;
+  }else{
+      LCD_DrawRectangle(player->tailX,
+                        player->tailX + BALL_SIZE,
+                        player->tailY,
+                        player->tailY + BALL_SIZE,
+                        LCD_BLACK);
+  }
   LCD_DrawRectangle(player->headX,
                     player->headX + BALL_SIZE,
                     player->headY,
                     player->headY + BALL_SIZE,
-                    player->color);
-  LCD_DrawRectangle(player->tailX,
-                    player->tailX + BALL_SIZE,
-                    player->tailY,
-                    player->tailY + BALL_SIZE,
                     player->color);
   G8RTOS_SignalSemaphore(&lcd);
   prev->headX = player->headX;
@@ -486,19 +498,6 @@ void UpdatePlayerOnScreen(PrevPlayer_t * prev, GeneralPlayerInfo_t * player){
  * Initializes and prints initial game state
  */
 void InitBoardState(){
-  gameState.players[HOST]= (GeneralPlayerInfo_t){100, 100, 0, 0, LCD_RED};
-  gameState.players[CLIENT]= (GeneralPlayerInfo_t){200, 200, 0, 0, LCD_BLUE};
-  gameState.winner = 0;
-  gameState.gameDone = false;
-  writeFIFO(HOST, 100);
-  writeFIFO(HOST, 100);
-  writeFIFO(CLIENT, 200);
-  writeFIFO(CLIENT, 200);
-  // for(int i = 0; i < MAX_NUM_OF_PLAYERS; i++){
-  //   gameState.LEDScores[i] = 0;
-  //   //gameState.overallScores[i] = 0;
-  // }
-
   G8RTOS_WaitSemaphore(&lcd);
   LCD_Init(false);
   G8RTOS_SignalSemaphore(&lcd);
