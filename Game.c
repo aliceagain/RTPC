@@ -207,7 +207,7 @@ void CreateGame(){
   InitBoardState();
 
   //change priorities later
-  G8RTOS_AddThread(MoveLEDs, 250, moveledsName);
+  G8RTOS_AddThread(MoveLEDs, 5, moveledsName);
   G8RTOS_AddThread(GenerateBall, 8, generateballName);
   G8RTOS_AddThread(DrawObjects, 1, drawobjectsName);
   G8RTOS_AddThread(ReadJoystickHost, 4, readjoystickName);
@@ -349,6 +349,7 @@ void MoveBall(){
         break;
       case CBOTTOM:
         ball->currentVelocityY *= -1;
+        ball->currentVelocityY += ball->currentVelocityY < MAX_BALL_SPEED ? 1 : 0;
         ball->currentVelocityX = ball->currentVelocityX == 0 ? 1 : ball->currentVelocityX;
         ball->color = gameState.players[CLIENT].color;
         break;
@@ -370,6 +371,7 @@ void MoveBall(){
                       (CollsionPos_t){BALL_SIZE,BALL_SIZE,ball->currentCenterX,ball->currentCenterY})){
     case CTOP:
       ball->currentVelocityY *= -1;
+      ball->currentVelocityY -= ball->currentVelocityY > -MAX_BALL_SPEED ? 1 : 0;
       ball->currentVelocityX = ball->currentVelocityX == 0 ? 1 : ball->currentVelocityX;
       ball->color = gameState.players[HOST].color;
       break;
@@ -397,11 +399,8 @@ void MoveBall(){
       ball->currentCenterX = HORIZ_CENTER_MIN_BALL;
     }
     if(ball->currentCenterY > VERT_CENTER_MAX_BALL){
-      if(ball->color == LCD_WHITE){
-          ball->currentVelocityY *= -1;
-
-      }else{
-          //gameState.LEDScores[CLIENT] |= 0x10<<gameState.overallScores[CLIENT]++;
+      //gameState.LEDScores[CLIENT] |= 0x10<<gameState.overallScores[CLIENT]++;
+      if(ball->color == gameState.players[CLIENT].color){
           if(gameState.LEDScores[CLIENT] == 0){
               gameState.LEDScores[CLIENT] = 1;
           }
@@ -409,30 +408,29 @@ void MoveBall(){
               gameState.LEDScores[CLIENT] |= (gameState.LEDScores[CLIENT] << 1);
           }
 
-          if(gameState.LEDScores[CLIENT] == 0x0F){
+          if(gameState.LEDScores[CLIENT] == 0xFF){
+            LP3943_LedModeSet(BLUE,((uint16_t)gameState.LEDScores[CLIENT]) << 8);
             gameState.winner = CLIENT;
             gameState.gameDone = true;
             gameState.overallScores[CLIENT]++;  //increase number of game wins
           }
-          ball->currentCenterX -= ball->currentVelocityX;
-          ball->currentCenterY -= ball->currentVelocityY;
-          G8RTOS_WaitSemaphore(&lcd);
-          LCD_DrawRectangle(ball->currentCenterX-BALL_SIZE_D2,
-                            ball->currentCenterX+BALL_SIZE_D2,
-                            ball->currentCenterY-BALL_SIZE_D2,
-                            ball->currentCenterY+BALL_SIZE_D2,
-                            LCD_BLACK);
-          G8RTOS_SignalSemaphore(&lcd);
-          gameState.numberOfBalls--;
-          G8RTOS_KillSelf();
       }
+      ball->currentCenterX -= ball->currentVelocityX;
+      ball->currentCenterY -= ball->currentVelocityY;
+      G8RTOS_WaitSemaphore(&lcd);
+      LCD_DrawRectangle(ball->currentCenterX-BALL_SIZE_D2,
+                        ball->currentCenterX+BALL_SIZE_D2,
+                        ball->currentCenterY-BALL_SIZE_D2,
+                        ball->currentCenterY+BALL_SIZE_D2,
+                        LCD_BLACK);
+      G8RTOS_SignalSemaphore(&lcd);
+      gameState.numberOfBalls--;
+      ball->alive = false;
+      G8RTOS_KillSelf();
     }
     if(ball->currentCenterY < VERT_CENTER_MIN_BALL){
-      if(ball->color == LCD_WHITE){
-          ball->currentVelocityY *= -1;
-
-      }else{
-          //gameState.LEDScores[HOST] |= 0xF>>gameState.overallScores[HOST]++;
+      //gameState.LEDScores[HOST] |= 0xF>>gameState.overallScores[HOST]++;
+      if(ball->color == gameState.players[HOST].color){
           if(gameState.LEDScores[HOST] == 0){
               gameState.LEDScores[HOST] = 128;    //msb set
           }
@@ -440,23 +438,25 @@ void MoveBall(){
               gameState.LEDScores[HOST] |= (gameState.LEDScores[HOST] >> 1);
           }
 
-          if(gameState.LEDScores[HOST] == 0xF0){
+          if(gameState.LEDScores[HOST] == 0xFF){
+            LP3943_LedModeSet(RED,gameState.LEDScores[HOST]);
             gameState.winner = HOST;
             gameState.gameDone = true;
             gameState.overallScores[HOST]++;
           }
-          ball->currentCenterX -= ball->currentVelocityX;
-          ball->currentCenterY -= ball->currentVelocityY;
-          G8RTOS_WaitSemaphore(&lcd);
-          LCD_DrawRectangle(ball->currentCenterX-BALL_SIZE_D2,
-                            ball->currentCenterX+BALL_SIZE_D2,
-                            ball->currentCenterY-BALL_SIZE_D2,
-                            ball->currentCenterY+BALL_SIZE_D2,
-                            LCD_BLACK);
-          G8RTOS_SignalSemaphore(&lcd);
-          gameState.numberOfBalls--;
-          G8RTOS_KillSelf();
       }
+      ball->currentCenterX -= ball->currentVelocityX;
+      ball->currentCenterY -= ball->currentVelocityY;
+      G8RTOS_WaitSemaphore(&lcd);
+      LCD_DrawRectangle(ball->currentCenterX-BALL_SIZE_D2,
+                        ball->currentCenterX+BALL_SIZE_D2,
+                        ball->currentCenterY-BALL_SIZE_D2,
+                        ball->currentCenterY+BALL_SIZE_D2,
+                        LCD_BLACK);
+      G8RTOS_SignalSemaphore(&lcd);
+      gameState.numberOfBalls--;
+      ball->alive = false;
+      G8RTOS_KillSelf();
     }
     sleep(35);
   }
