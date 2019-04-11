@@ -132,7 +132,8 @@ typedef enum
 typedef struct
 {
     uint32_t IP_address;
-    int16_t displacement;
+    int16_t displacementX;
+    int16-t displacementY;
     uint8_t playerNumber;
     bool ready;
     bool joined;
@@ -145,9 +146,11 @@ typedef struct
  */
 typedef struct
 {
-    int16_t currentCenter;
+    int16_t headX;
+    int16_t headY;
+    int16_t tailX;
+    int16_t tailY;
     uint16_t color;
-    playerPosition position;
 } GeneralPlayerInfo_t;
 
 /*
@@ -157,10 +160,6 @@ typedef struct
 {
     int16_t currentCenterX;
     int16_t currentCenterY;
-    int16_t currentVelocityX;
-    int16_t currentVelocityY;
-    uint16_t color;
-    bool alive;
 } Ball_t;
 
 /*
@@ -170,12 +169,9 @@ typedef struct
 {
     SpecificPlayerInfo_t player;
     GeneralPlayerInfo_t players[MAX_NUM_OF_PLAYERS];
-    Ball_t balls[MAX_NUM_OF_BALLS];
-    uint16_t numberOfBalls;
+    Ball_t snack;
     bool winner;
     bool gameDone;
-    uint8_t LEDScores[MAX_NUM_OF_PLAYERS];
-    uint8_t overallScores[MAX_NUM_OF_PLAYERS];
 } GameState_t;
 #pragma pack ( pop )
 
