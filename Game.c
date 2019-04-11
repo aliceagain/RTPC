@@ -50,9 +50,9 @@ void JoinGame(){
   //change priorities later
 
   G8RTOS_AddThread(MoveLEDs, 250, moveledsName);
-  G8RTOS_AddThread(DrawObjects, 2, drawobjectsName);
-  G8RTOS_AddThread(ReadJoystickClient, 1, readjoystickName);
-  G8RTOS_AddThread(SendDataToHost, 3, senddatatName);
+  G8RTOS_AddThread(DrawObjects, 6, drawobjectsName);
+  G8RTOS_AddThread(ReadJoystickClient, 2, readjoystickName);
+  G8RTOS_AddThread(SendDataToHost, 5, senddatatName);
   G8RTOS_AddThread(ReceiveDataFromHost, 4, receivedataName);
 
   G8RTOS_AddThread(IdleThread, 254, idlethreadName);
@@ -149,21 +149,20 @@ void EndOfGameClient(){
   else{
     LCD_Clear(gameState.players[CLIENT].color); 
   }
-  LCD_Text(20,100,(uint8_t*)endOfGameText,LCD_BLACK);
   G8RTOS_SignalSemaphore(&lcd);
 
   G8RTOS_WaitSemaphore(&cc3100);
-  while(ReceiveData((uint8_t *)&gameState, sizeof(gameState)) == NOTHING_RECEIVED);  //** CHECK: wait for new game state to see if restart?
+  while(ReceiveData((uint8_t *)&gameState, sizeof(GameState_t)) <= 0);  //** CHECK: wait for new game state to see if restart?
   G8RTOS_SignalSemaphore(&cc3100);
 
   InitBoardState(); //re-init board state
 
   //re-add threads
   G8RTOS_AddThread(MoveLEDs, 250, moveledsName);
-  G8RTOS_AddThread(DrawObjects, 2, drawobjectsName);
-  G8RTOS_AddThread(ReadJoystickClient, 1, readjoystickName);
-  G8RTOS_AddThread(SendDataToHost, 3, senddatatName);
-  G8RTOS_AddThread(ReceiveDataFromHost, 4, receivedataName);
+  G8RTOS_AddThread(DrawObjects, 5, drawobjectsName);
+  G8RTOS_AddThread(ReadJoystickClient, 2, readjoystickName);
+  G8RTOS_AddThread(SendDataToHost, 4, senddatatName);
+  G8RTOS_AddThread(ReceiveDataFromHost, 3, receivedataName);
   G8RTOS_AddThread(IdleThread, 254, idlethreadName);
 
   //reset game variables ***
