@@ -414,6 +414,8 @@ void MoveBall(){
             gameState.gameDone = true;
             gameState.overallScores[CLIENT]++;  //increase number of game wins
           }
+          ball->currentCenterX -= ball->currentVelocityX;
+          ball->currentCenterY -= ball->currentVelocityY;
           G8RTOS_WaitSemaphore(&lcd);
           LCD_DrawRectangle(ball->currentCenterX-BALL_SIZE_D2,
                             ball->currentCenterX+BALL_SIZE_D2,
@@ -443,6 +445,8 @@ void MoveBall(){
             gameState.gameDone = true;
             gameState.overallScores[HOST]++;
           }
+          ball->currentCenterX -= ball->currentVelocityX;
+          ball->currentCenterY -= ball->currentVelocityY;
           G8RTOS_WaitSemaphore(&lcd);
           LCD_DrawRectangle(ball->currentCenterX-BALL_SIZE_D2,
                             ball->currentCenterX+BALL_SIZE_D2,
