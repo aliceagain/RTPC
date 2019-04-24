@@ -31,10 +31,10 @@ semaphore_t globalState;
 /*********************************************** Global Defines ********************************************************************/
 
 /* Size of game arena */
-#define DRAWABLE_MIN_X                  33
-#define DRAWABLE_MAX_X                  287
-#define DRAWABLE_MIN_Y                  20
-#define DRAWABLE_MAX_Y                  220
+#define DRAWABLE_MIN_X                  100
+#define DRAWABLE_MAX_X                  200
+#define DRAWABLE_MIN_Y                  100
+#define DRAWABLE_MAX_Y                  200
 
 /* Size of objects */
 #define BRUSH_MAX                       1
@@ -48,6 +48,10 @@ semaphore_t globalState;
 #define SELF 0
 #define FRIEND 1
 
+/* Used as status LEDs for Wi-Fi */
+#define BLUE_LED BIT2
+#define RED_LED BIT0
+
 typedef enum {
     point,
     undo
@@ -58,20 +62,11 @@ typedef enum {
 /*********************************************** Data Structures ********************************************************************/
 /*********************************************** Data Structures ********************************************************************/
 #pragma pack ( push, 1)
-/*
- * Struct to be sent to and from the client and the host
- */
-typedef struct{
-    PacketType header;
-    BrushStroke_t stroke;
-} Packet_t;
 
 #pragma pack ( pop )
 
 typedef struct{
-    uint8_t r;
-    uint8_t g;
-    uint8_t b;
+    uint8_t c;
 }Color_t;
 
 typedef struct{
@@ -95,7 +90,7 @@ typedef struct{
 }BrushStroke_t;
 
 typedef struct{
-    Pixel_t board[(DRAWABLE_MAX_X-DRAWABLE_MIN_X)*(DRAWABLE_MAX_Y-DRAWABLE_MIN_Y)];
+    Pixel_t board[((DRAWABLE_MAX_X-DRAWABLE_MIN_X)>>1)*((DRAWABLE_MAX_Y-DRAWABLE_MIN_Y)>>1)];
 }Board_t;
 
 typedef struct{
@@ -103,9 +98,18 @@ typedef struct{
 }StrokeQueue_t;
 
 /*
+ * Struct to be sent to and from the client and the host
+ */
+typedef struct{
+    PacketType header;
+    BrushStroke_t stroke;
+} Packet_t;
+
+/*
  * GameState
  */
 typedef struct{
+    uint32_t ip;
     Brush_t currentBrush;
     Board_t selfBoard;
     Board_t friendBoard;
@@ -148,7 +152,7 @@ void Draw();
 /*
  * Connect two boards together over wifi
  */
-void InitialConnection();
+void WaitInit();
 
 void IdleThread();
 

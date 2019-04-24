@@ -9,153 +9,6 @@ char sendDatatName[] = "sendData";
 char receiveDataName[] = "receiveData";
 char drawName[] = "Draw";
 
-/*********************************************** Client Threads *********************************************************************/
-/*
- * Thread for client to join game
- */
-void JoinGame(){
-  G8RTOS_InitSemaphore(&cc3100, 1);
-  G8RTOS_InitSemaphore(&lcd, 1);
-  G8RTOS_InitSemaphore(&player, 1);
-  initCC3100(Client);
-
-
-  //init specific player info for client
-  gameState.player.IP_address = getLocalIP();
-  gameState.player.displacementX = 0;
-  gameState.player.displacementY = 0;
-  gameState.player.playerNumber = CLIENT;  //0 = client, 1 = host
-  gameState.player.ready = true;
-  gameState.player.joined = false;
-  gameState.player.acknowledge = false;
-
-  G8RTOS_WaitSemaphore(&cc3100);
-  SendData((uint8_t *)&gameState.player, HOST_IP_ADDR, sizeof(SpecificPlayerInfo_t));
-  G8RTOS_SignalSemaphore(&cc3100);
-
-  G8RTOS_WaitSemaphore(&cc3100);
-  while(ReceiveData((uint8_t *)&gameState, sizeof(GameState_t)) == NOTHING_RECEIVED);
-  G8RTOS_SignalSemaphore(&cc3100);
-
-  P2->DIR |= BLUE_LED;  //p1.0 set to output
-  BITBAND_PERI(P2->OUT, 2) = 1;  //toggle led on
-
-  InitBoardState();
-
-  //change priorities later
-
-  G8RTOS_AddThread(DrawObjects, 1, drawobjectsName);
-  G8RTOS_AddThread(ReadJoystickClient, 2, readjoystickName);
-  G8RTOS_AddThread(SendDataToHost, 5, senddatatName);
-  G8RTOS_AddThread(ReceiveDataFromHost, 4, receivedataName);
-  G8RTOS_AddThread(IdleThread, 254, idlethreadName);
-  
-  G8RTOS_KillSelf();
-}
-
-/*
- * Thread that receives game state packets from host
- */
-void ReceiveDataFromHost(){
-  int16_t inpacket[12];
-  while(1){
-    G8RTOS_WaitSemaphore(&cc3100);
-    while(ReceiveData((uint8_t *)&inpacket, sizeof(int16_t) * 12) == NOTHING_RECEIVED){
-      G8RTOS_SignalSemaphore(&cc3100);  
-
-      sleep(1);
-      G8RTOS_WaitSemaphore(&cc3100);
-    }
-    G8RTOS_SignalSemaphore(&cc3100);
-
-    G8RTOS_WaitSemaphore(&player);
-    gameState.players[0].headX = inpacket[0];
-    gameState.players[0].headY = inpacket[1];
-    gameState.players[0].tailX = inpacket[2];
-    gameState.players[0].tailY = inpacket[3];
-    gameState.players[1].headX = inpacket[4];
-    gameState.players[1].headY = inpacket[5];
-    gameState.players[1].tailX = inpacket[6];
-    gameState.players[1].tailY = inpacket[7];
-    gameState.snack.currentCenterX = inpacket[8];
-    gameState.snack.currentCenterY = inpacket[9];
-    gameState.winner = inpacket[10];
-    gameState.gameDone = inpacket[11];
-    G8RTOS_SignalSemaphore(&player);
-
-
-    if(gameState.gameDone == true){
-      G8RTOS_AddThread(EndOfGameClient, 0, endofgameName);
-    }
-    sleep(2);
-  }
-}
-
-/*
- * Thread that sends UDP packets to host
- */
-void SendDataToHost(){
-  while(1){
-    G8RTOS_WaitSemaphore(&cc3100);
-    SendData((uint8_t *)&gameState.player.displacementX, HOST_IP_ADDR, sizeof(int16_t)*2);
-    G8RTOS_SignalSemaphore(&cc3100);
-    sleep(2);
-  }
-}
-
-/*********************************************** Client Threads *********************************************************************/
-
-
-/*********************************************** Host Threads *********************************************************************/
-/*
- * Thread for the host to create a game
- */
-void CreateGame(){
-  G8RTOS_InitSemaphore(&cc3100, 1);
-  G8RTOS_InitSemaphore(&lcd, 1);
-  G8RTOS_InitSemaphore(&player, 1);
-  G8RTOS_InitFIFO(HOST);
-  G8RTOS_InitFIFO(CLIENT);
-  spawnDot();
-  gameState.players[HOST]= (GeneralPlayerInfo_t){100, 100, 0, 0, LCD_RED, 1, -1};
-  gameState.players[CLIENT]= (GeneralPlayerInfo_t){200, 200, 0, 0, LCD_BLUE, 1, -1};
-  gameState.winner = 0;
-  gameState.gameDone = false;
-  writeFIFO(HOST, gameState.players[HOST].headX);
-  writeFIFO(HOST, gameState.players[HOST].headY);
-  writeFIFO(HOST, gameState.players[CLIENT].headX);
-  writeFIFO(HOST, gameState.players[CLIENT].headY);
-  G8RTOS_WaitSemaphore(&cc3100);
-  initCC3100(Host);
-
-  while(ReceiveData((uint8_t * )&gameState.player, sizeof(SpecificPlayerInfo_t)) == NOTHING_RECEIVED);
-  gameState.player.joined = true;
-  gameState.player.acknowledge = true;
-  SendData((uint8_t * ) &gameState, gameState.player.IP_address, sizeof(gameState));
-  G8RTOS_SignalSemaphore(&cc3100);
-
-  P2->DIR |= RED_LED;  //p1.0 set to output
-  BITBAND_PERI(P2->OUT, 0) = 1;  //toggle led on
-
-  InitBoardState();
-
-  //change priorities later
-  G8RTOS_AddThread(DrawObjects, 1, drawobjectsName);
-  G8RTOS_AddThread(ReadJoystickHost, 4, readjoystickName);
-  G8RTOS_AddThread(SendDataToClient, 2, senddatatName);
-  G8RTOS_AddThread(ReceiveDataFromClient, 3, receivedataName);
-  G8RTOS_AddThread(IdleThread,254,idlethreadName);
-
-
-  G8RTOS_KillSelf();
-
-  while(1);
-}
-
-
-/*********************************************** Host Threads *********************************************************************/
-
-
 /*********************************************** Common Threads *********************************************************************/
 
 void Send(){
@@ -205,7 +58,7 @@ void Draw(){
   while(1){
     if(prevBoard == state.currentBoard && state.currentBoard == SELF){
       if(lastTouch.x != state.touch.x || lastTouch.y != state.touch.y){
-        if((lastDrawnStroke+1)%16 == lastSentStroke){
+        if((state.lastDrawnStroke+1)%16 == state.lastSentStroke){
           G8RTOS_Yield();
         }else{
           DrawStroke();
@@ -270,6 +123,11 @@ void PORT5_IRQHandler(){
 void WaitInit(){
     initInterrupts();
     while(!(isHost || isClient));
+    G8RTOS_InitSemaphore(&cc3100, 1);
+    G8RTOS_InitSemaphore(&lcd, 1);
+    G8RTOS_InitSemaphore(&screenSelf, 1);
+    G8RTOS_InitSemaphore(&screenFriend, 1);
+    G8RTOS_InitSemaphore(&globalState, 1);
     if(isHost){
         InitHost();
     }else if(isClient){
@@ -283,14 +141,52 @@ void WaitInit(){
 
 /*********************************************** Public Functions *********************************************************************/
 
-void InitHost(){}
+void InitHost(){
+  initCC3100(Host);
+  while(ReceiveData((uint8_t * )&state.ip, sizeof(uint32_t)) == NOTHING_RECEIVED);
 
-void InitClient(){}
+  uint8_t temp;
+  SendData((uint8_t * ) &temp, state.ip, sizeof(uint8_t));
 
-void DrawBoard(){}
+  P2->DIR |= RED_LED;  //p1.0 set to output
+  BITBAND_PERI(P2->OUT, 0) = 1;  //toggle led on
+}
 
-void RedrawStrokes(){}
+void InitClient(){
+  initCC3100(Client);
+  state.ip = getLocalIP();
 
-void DrawStroke(){}
+  SendData((uint8_t *)&state.ip, HOST_IP_ADDR, sizeof(uint32_t));
+
+  uint8_t temp;
+  while(ReceiveData(&temp, sizeof(uint8_t)) == NOTHING_RECEIVED);
+
+  P2->DIR |= BLUE_LED;  //p1.0 set to output
+  BITBAND_PERI(P2->OUT, 2) = 1;  //toggle led on
+}
+
+void CreateThreadsAndStart(){
+  while(1);
+}
+
+void DrawBoard(){
+
+}
+
+void RedrawStrokes(){
+
+}
+
+void DrawStroke(){
+
+}
+
+void SendStroke(){
+
+}
+
+void ReceiveStroke(){
+
+}
 
 /*********************************************** Public Functions *********************************************************************/
