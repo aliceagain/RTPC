@@ -2,18 +2,12 @@
 #include "BSP.h"
 #include "stdio.h"
 /*********************************************** Global Vars *********************************************************************/
-GameState_t gameState;
-char readjoystickName[] = "readJoystick";
+GameState_t state;
+char readTouchName[] = "readTouch";
 char idlethreadName[] = "idle";
-char senddatatName[] = "sendData";
-char receivedataName[] = "receiveData";
-char drawobjectsName[] = "DrawObjects";
-char moveledsName[] = "MoveLEDs";
-char endofgameName[] = "EndofGame";
-char generateballName[] = "GenerateBall";
-char moveballName[] = "MoveBall";
-char scoreClient[] = "0";
-char scoreHost[] = "0";
+char sendDatatName[] = "sendData";
+char receiveDataName[] = "receiveData";
+char drawName[] = "Draw";
 
 /*********************************************** Client Threads *********************************************************************/
 /*
@@ -109,51 +103,6 @@ void SendDataToHost(){
   }
 }
 
-/*
- * Thread to read client's joystick
- */
-void ReadJoystickClient(){
-  int16_t xcoord, ycoord;
-
-  while(1){
-    GetJoystickCoordinates(&xcoord, &ycoord);   //read x coord;
-    gameState.player.displacementX = xcoord;
-    gameState.player.displacementY = ycoord;
-    sleep(10);
-  }
-  
-  
-}
-
-/*
- * End of game for the client
- */
-void EndOfGameClient(){
-
-  G8RTOS_WaitSemaphore(&cc3100);
-  G8RTOS_WaitSemaphore(&lcd);
-  G8RTOS_WaitSemaphore(&player);
-
-  G8RTOS_KillOthers();
-
-  G8RTOS_InitSemaphore(&lcd, 1);
-  G8RTOS_InitSemaphore(&cc3100, 1);
-  G8RTOS_InitSemaphore(&player, 1);
-
-  G8RTOS_WaitSemaphore(&lcd);
-  if(gameState.winner == HOST){
-    LCD_Clear(gameState.players[HOST].color);  
-  }
-  else{
-    LCD_Clear(gameState.players[CLIENT].color); 
-  }
-  G8RTOS_SignalSemaphore(&lcd);
-
-  G8RTOS_KillSelf();
-
-
-
-}
 /*********************************************** Client Threads *********************************************************************/
 
 
@@ -167,8 +116,9 @@ void CreateGame(){
   G8RTOS_InitSemaphore(&player, 1);
   G8RTOS_InitFIFO(HOST);
   G8RTOS_InitFIFO(CLIENT);
-  gameState.players[HOST]= (GeneralPlayerInfo_t){100, 100, 0, 0, LCD_RED, 1, 0};
-  gameState.players[CLIENT]= (GeneralPlayerInfo_t){200, 200, 0, 0, LCD_BLUE, 1, 0};
+  spawnDot();
+  gameState.players[HOST]= (GeneralPlayerInfo_t){100, 100, 0, 0, LCD_RED, 1, -1};
+  gameState.players[CLIENT]= (GeneralPlayerInfo_t){200, 200, 0, 0, LCD_BLUE, 1, -1};
   gameState.winner = 0;
   gameState.gameDone = false;
   writeFIFO(HOST, gameState.players[HOST].headX);
@@ -202,204 +152,80 @@ void CreateGame(){
   while(1);
 }
 
-/*
- * Thread that sends game state to client
- */
-void SendDataToClient(){
-  int16_t outPacket[12];
-  while(1){
-    G8RTOS_WaitSemaphore(&player);
-    outPacket[0] = gameState.players[0].headX;
-    outPacket[1] = gameState.players[0].headY;
-    outPacket[2] = gameState.players[0].tailX;
-    outPacket[3] = gameState.players[0].tailY;
-    outPacket[4] = gameState.players[1].headX;
-    outPacket[5] = gameState.players[1].headY;
-    outPacket[6] = gameState.players[1].tailX;
-    outPacket[7] = gameState.players[1].tailY;
-    outPacket[8] = gameState.snack.currentCenterX;
-    outPacket[9] = gameState.snack.currentCenterY;
-    outPacket[10] = gameState.winner;
-    outPacket[11] = gameState.gameDone;
-    G8RTOS_SignalSemaphore(&player);
-    G8RTOS_WaitSemaphore(&cc3100);
-    SendData((uint8_t * ) outPacket, gameState.player.IP_address, sizeof(int16_t)*12);
-    G8RTOS_SignalSemaphore(&cc3100);
-    if(gameState.gameDone){
-      G8RTOS_AddThread(EndOfGameHost, 0, endofgameName);
-    }
-    sleep(5);
-  }
-}
-
-/*
- * Thread that receives UDP packets from client
- */
-void ReceiveDataFromClient(){
-  int16_t tempDisplacement[2];
-  int16_t velocityX = 1;
-  int16_t velocityY = 0;
-  while(1){
-   G8RTOS_WaitSemaphore(&cc3100);
-   while(ReceiveData((uint8_t * )&tempDisplacement, sizeof(int16_t)*2) == NOTHING_RECEIVED){
-     G8RTOS_SignalSemaphore(&cc3100);
-     sleep(1);
-     G8RTOS_WaitSemaphore(&cc3100);
-   }
-   G8RTOS_SignalSemaphore(&cc3100);
-   if(!((tempDisplacement[0] > 3000 || tempDisplacement[0] < -3000)&&(tempDisplacement[1] > 3000 || tempDisplacement[1] < -3000))){
-      if(velocityY != 0){
-        if(tempDisplacement[0] > 3000){
-          velocityX = -4;
-          velocityY = 0;
-        }else if(tempDisplacement[0] < -3000){
-          velocityX = 4;
-          velocityY = 0;
-        }
-      }else if(tempDisplacement[0] != 0){
-        if(tempDisplacement[1] > 3000){
-          velocityY = 4;
-          velocityX = 0;
-        }else if(tempDisplacement[1] < -3000){
-          velocityY = -4;
-          velocityX = 0;
-        }
-      }
-   }
-
-   G8RTOS_WaitSemaphore(&player);
-   gameState.players[CLIENT].headX += velocityX;
-   gameState.players[CLIENT].headY += velocityY;
-   if(gameState.players[CLIENT].headX < 0){
-     gameState.players[CLIENT].headX += 320;
-   }else{
-     gameState.players[CLIENT].headX %= 320;
-   }
-   if(gameState.players[CLIENT].headY < 0){
-     gameState.players[CLIENT].headY += 240;
-   }else{
-     gameState.players[CLIENT].headY %= 240;
-   }
-   G8RTOS_SignalSemaphore(&player);
-   writeFIFO(CLIENT,gameState.players[CLIENT].headX);
-   writeFIFO(CLIENT,gameState.players[CLIENT].headY);
-   sleep(2);
-  }
-}
-
-/*
- * Thread to read host's joystick
- */
-void ReadJoystickHost(){
-  int16_t xcoord, ycoord; //ycoord not needed
-  int16_t velocityX = 0;
-  int16_t velocityY = 1;
-  while(1){
-    GetJoystickCoordinates(&xcoord, &ycoord);   //read x coord;
-    if(!((xcoord > 3000 || xcoord < -3000)&&(ycoord > 3000 || ycoord < -3000))){
-        if(velocityY != 0){
-            if(xcoord > 3000){
-                velocityX = -4;
-                velocityY = 0;
-            }else if(xcoord < -3000){
-                velocityX = 4;
-                velocityY = 0;
-            }
-        }else if(velocityX != 0){
-            if(ycoord > 3000){
-                velocityY = 4;
-                velocityX = 0;
-            }else if(ycoord < -3000){
-                velocityY = -4;
-                velocityX = 0;
-            }
-        }
-    }
-    sleep(10);
-    G8RTOS_WaitSemaphore(&player);
-    gameState.players[HOST].headX += velocityX;
-    gameState.players[HOST].headY += velocityY;
-    if(gameState.players[HOST].headX < 0){
-      gameState.players[HOST].headX += 320;
-    }else{
-      gameState.players[HOST].headX %= 320;
-    }
-    if(gameState.players[HOST].headY < 0){
-      gameState.players[HOST].headY += 240;
-    }else{
-      gameState.players[HOST].headY %= 240;
-    }
-    G8RTOS_SignalSemaphore(&player);
-    writeFIFO(HOST,gameState.players[HOST].headX);
-    writeFIFO(HOST,gameState.players[HOST].headY);
-  }  
-}
-
-/*
- * Thread to move a single ball
- */
-
-bool restart = false;
-void EndofGameButtonHandler(){
-  restart = true;
-  P4->IFG &= ~BIT4;
-  P4->IE &= ~BIT4;
-}
-
-/*
- * End of game for the host
- */
-char endOfGameText[] = "Press Host Button on Host to Restart Game.";
-void EndOfGameHost(){
-    G8RTOS_WaitSemaphore(&cc3100);
-    G8RTOS_WaitSemaphore(&lcd);
-    G8RTOS_WaitSemaphore(&player);
-    G8RTOS_KillOthers();
-    G8RTOS_InitSemaphore(&cc3100, 1);
-    G8RTOS_InitSemaphore(&lcd, 1);
-    G8RTOS_InitSemaphore(&player, 1);
-    
-    G8RTOS_WaitSemaphore(&lcd);
-    LCD_Clear(gameState.winner == HOST ? gameState.players[HOST].color : gameState.players[CLIENT].color);
-    LCD_Text(20,100,(uint8_t*)endOfGameText,LCD_BLACK);
-    G8RTOS_SignalSemaphore(&lcd);
-    
-
-    G8RTOS_KillSelf();
-}
 
 /*********************************************** Host Threads *********************************************************************/
 
 
 /*********************************************** Common Threads *********************************************************************/
+
+void Send(){
+  while(1){
+    G8RTOS_WaitSemaphore(&globalState);
+    if(state.lastDrawnStroke != state.lastSentStroke){
+      for(; state.lastDrawnStroke != state.lastSentStroke; state.lastSentStroke++){
+        SendStroke();
+        G8RTOS_SignalSemaphore(&globalState);
+        sleep(4);
+        G8RTOS_WaitSemaphore(&globalState);
+      }
+    }else{
+      G8RTOS_SignalSemaphore(&globalState);
+    }
+    sleep(10);
+  }
+}
+
+void Receive(){
+  while(1){
+    ReceiveStroke();
+    sleep(2);
+  }
+}
+
+uint16_t touchX;
+uint16_t touchY;
+void ProcessTouch(){
+    G8RTOS_WaitSemaphore(&globalState);
+    if(touchX > DRAWABLE_MIN_X && touchX < DRAWABLE_MAX_X &&
+       touchY > DRAWABLE_MIN_Y && touchY < DRAWABLE_MIN_Y){
+      state.touch.x = touchX - DRAWABLE_MIN_X;
+      state.touch.y = touchY - DRAWABLE_MIN_Y;
+    }
+    G8RTOS_SignalSemaphore(&globalState);
+    sleep(4);
+}
+
+void ReadTouch(){
+  //READ Touch
+}
+
+void Draw(){
+  uint8_t prevBoard = -1;
+  ScreenPos_t lastTouch = (ScreenPos_t){0,0};
+  while(1){
+    if(prevBoard == state.currentBoard && state.currentBoard == SELF){
+      if(lastTouch.x != state.touch.x || lastTouch.y != state.touch.y){
+        if((lastDrawnStroke+1)%16 == lastSentStroke){
+          G8RTOS_Yield();
+        }else{
+          DrawStroke();
+        }
+      }
+    }else if(prevBoard != state.currentBoard){
+      DrawBoard();
+      RedrawStrokes();
+      prevBoard = state.currentBoard;
+    }
+    sleep(1);
+  }
+}
+
 /*
  * Idle thread
  */
 void IdleThread(){
   while(1){
       G8RTOS_Yield();
-  }
-}
-
-/*
- * Thread to draw all the objects in the game
- */
-void DrawObjects(){
-  PrevPlayer_t prevPlayers[MAX_NUM_OF_PLAYERS];
-  while(1){
-    for(int i = 0; i < MAX_NUM_OF_PLAYERS; i++){
-      if(prevPlayers[i].headX != gameState.players[i].headX || prevPlayers[i].headY != gameState.players[i].headY){  //if player has moved
-        G8RTOS_WaitSemaphore(&player);
-        int16_t tempX = readFIFO(i);
-        int16_t tempY = readFIFO(i);
-        gameState.players[i].tailX = tempX;
-        gameState.players[i].tailY = tempY;
-        UpdatePlayerOnScreen(&prevPlayers[i],&gameState.players[i]);
-        G8RTOS_SignalSemaphore(&player);
-      }
-    }
-    
-    sleep(20);
   }
 }
 
@@ -445,11 +271,11 @@ void WaitInit(){
     initInterrupts();
     while(!(isHost || isClient));
     if(isHost){
-        G8RTOS_AddThread(CreateGame,1,NULL);
+        InitHost();
     }else if(isClient){
-        G8RTOS_AddThread(JoinGame,1,NULL);
+        InitClient();
     }
-    G8RTOS_KillSelf();
+    CreateThreadsAndStart();
 }
 
 /*********************************************** Common Threads *********************************************************************/
@@ -457,84 +283,14 @@ void WaitInit(){
 
 /*********************************************** Public Functions *********************************************************************/
 
-/*
- * Draw players given center X center coordinate
- */
-void DrawPlayer(GeneralPlayerInfo_t * player){
-  G8RTOS_WaitSemaphore(&lcd);
-      LCD_DrawRectangle(player->headX,
-                      player->headX + BALL_SIZE,
-                      player->headY,
-                      player->headY + BALL_SIZE,
-                      player->color);
-  
-  G8RTOS_SignalSemaphore(&lcd);
-}
+void InitHost(){}
 
-/*
- * Updates player's paddle based on current and new center
- */
-void UpdatePlayerOnScreen(PrevPlayer_t * prev, GeneralPlayerInfo_t * player){
-  G8RTOS_WaitSemaphore(&lcd);
-  if(player->currentSize < player->size){
-      player->currentSize++;
-  }else{
-      LCD_DrawRectangle(player->tailX,
-                        player->tailX + BALL_SIZE,
-                        player->tailY,
-                        player->tailY + BALL_SIZE,
-                        LCD_BLACK);
-  }
-  LCD_DrawRectangle(player->headX,
-                    player->headX + BALL_SIZE,
-                    player->headY,
-                    player->headY + BALL_SIZE,
-                    player->color);
-  G8RTOS_SignalSemaphore(&lcd);
-  prev->headX = player->headX;
-  prev->headY = player->headY;
-}
-/*
- * Initializes and prints initial game state
- */
-void InitBoardState(){
-  G8RTOS_WaitSemaphore(&lcd);
-  LCD_Init(false);
-  G8RTOS_SignalSemaphore(&lcd);
+void InitClient(){}
 
-  DrawPlayer(&gameState.players[HOST]);
-  DrawPlayer(&gameState.players[CLIENT]);
-}
+void DrawBoard(){}
 
-inline int32_t abs(int32_t x){
-  return x < 0 ? -x : x;
-}
+void RedrawStrokes(){}
 
-collisionPosition collision(CollsionPos_t A, CollsionPos_t B){
-  int32_t w = (A.width + B.width)>>1;
-  int32_t h = (A.height + B.height)>>1;
-  int32_t dx = A.centerX - B.centerX;
-  int32_t dy = A.centerY - B.centerY;
-
-  if (abs(dx) <= w && abs(dy) <= h){
-    /* collision! */
-    int32_t wy = w * dy;
-    int32_t hx = h * dx;
-    if (wy > hx){
-      if (wy > -hx){
-        return CTOP;
-      }else{
-        return CBOTTOM;
-      }
-    }else{
-      if (wy > -hx){
-       return CRIGHT;
-      }else{
-        return CLEFT;
-      }
-    }
-  }
-  return CNONE;
-}
+void DrawStroke(){}
 
 /*********************************************** Public Functions *********************************************************************/

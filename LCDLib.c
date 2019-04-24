@@ -529,6 +529,8 @@ uint16_t TP_ReadX(){
 
     uint16_t val;
 
+    MAP_CS_initClockSignal(CS_SMCLK, CS_HFXTCLK_SELECT, CS_CLOCK_DIVIDER_8);    //Sets SMCLK to 6 MHz to avoid deadzones
+
     SPI_CS_TP_LOW;
 
     SPISendRecvByte(CHX);
@@ -536,6 +538,9 @@ uint16_t TP_ReadX(){
     val |= SPISendRecvByte(0) >> 3;
 
     SPI_CS_TP_HIGH;
+
+    MAP_CS_initClockSignal(CS_SMCLK, CS_HFXTCLK_SELECT, CS_CLOCK_DIVIDER_4);    //Resets SMCLK to 12 MHz
+
     val = (val-384)*MAX_SCREEN_X/(4095-384);
     return val;
 }
@@ -551,6 +556,8 @@ uint16_t TP_ReadX(){
 uint16_t TP_ReadY(){
     uint16_t val;
 
+    MAP_CS_initClockSignal(CS_SMCLK, CS_HFXTCLK_SELECT, CS_CLOCK_DIVIDER_8);    //Sets SMCLK to 6 MHz to avoid deadzones
+
     SPI_CS_TP_LOW;
 
     SPISendRecvByte(CHY);
@@ -558,6 +565,9 @@ uint16_t TP_ReadY(){
     val |= SPISendRecvByte(0) >> 3;
     val = (val-255)*MAX_SCREEN_Y/(4095-255);
     SPI_CS_TP_HIGH;
+
+    MAP_CS_initClockSignal(CS_SMCLK, CS_HFXTCLK_SELECT, CS_CLOCK_DIVIDER_4);    //Resets SMCLK to 12 MHz
+
     return val;
 }
 
