@@ -14,9 +14,9 @@ char drawName[] = "Draw";
 void Send(){
   while(1){
     G8RTOS_WaitSemaphore(&globalState);
-    if(state.lastDrawnStroke != state.lastSentStroke){
-      for(; state.lastDrawnStroke != state.lastSentStroke; state.lastSentStroke++){
-        SendStroke();
+    if(state.stackPos > state.lastSentStroke){
+      for(; state.stackPos > state.lastSentStroke; state.lastSentStroke++){
+        SendStroke(&state.selfQueue[state.lastSentStroke]);
         G8RTOS_SignalSemaphore(&globalState);
         sleep(4);
         G8RTOS_WaitSemaphore(&globalState);
@@ -30,7 +30,10 @@ void Send(){
 
 void Receive(){
   while(1){
-    ReceiveStroke();
+    G8RTOS_WaitSemaphore(&globalState);
+    ReceiveStroke(&state.selfQueue[state.friendStackPos]);
+    state.friendStackPos++;
+    G8RTOS_SignalSemaphore(&globalState);
     sleep(2);
   }
 }
@@ -38,14 +41,25 @@ void Receive(){
 uint16_t touchX;
 uint16_t touchY;
 void ProcessTouch(){
+  uint16_t lastX;
+  uint16_t lastY;
+  while(1){
     G8RTOS_WaitSemaphore(&globalState);
     if(touchX > DRAWABLE_MIN_X && touchX < DRAWABLE_MAX_X &&
        touchY > DRAWABLE_MIN_Y && touchY < DRAWABLE_MIN_Y){
-      state.touch.x = touchX - DRAWABLE_MIN_X;
-      state.touch.y = touchY - DRAWABLE_MIN_Y;
+      if(abs(touchX-lastX) > MIN_DIST || abs(touchX-lastY) > MIN_DIST){
+        lastX = touchX;
+        lastY = touchY;
+        state.selfQueue[stackPos].pos.x = touchX - DRAWABLE_MIN_X;
+        state.selfQueue[stackPos].pos.y = touchY - DRAWABLE_MIN_Y;
+        state.selfQueue[stackPos].brush.color = state.currentBrush.color;
+        state.selfQueue[stackPos].brush.size = state.currentBrush.size;
+        stackPos++;
+      }
     }
     G8RTOS_SignalSemaphore(&globalState);
     sleep(4);
+  }
 }
 
 void ReadTouch(){
@@ -54,14 +68,12 @@ void ReadTouch(){
 
 void Draw(){
   uint8_t prevBoard = -1;
-  ScreenPos_t lastTouch = (ScreenPos_t){0,0};
+  ScreenPos_t lastStackPosition = 0;
   while(1){
     if(prevBoard == state.currentBoard && state.currentBoard == SELF){
-      if(lastTouch.x != state.touch.x || lastTouch.y != state.touch.y){
-        if((state.lastDrawnStroke+1)%16 == state.lastSentStroke){
-          G8RTOS_Yield();
-        }else{
-          DrawStroke();
+      if(state.stackPos > lastStackPosition){
+        for(; state.statePos > lastStackPosition; lastStackPosition++){
+          DrawStroke(&state.selfQueue[lastStackPosition]);
         }
       }
     }else if(prevBoard != state.currentBoard){
@@ -191,22 +203,30 @@ void CreateThreadsAndStart(){
 }
 
 void DrawBoard(){
-
+  G8RTOS_WaitSemaphore(&lcd);
+  
+  G8RTOS_SignalSemaphore(&lcd);
 }
 
 void RedrawStrokes(){
 
 }
 
-void DrawStroke(){
+void DrawStroke(BrushStroke_t * stroke){
 
 }
 
-void SendStroke(){
+//Already has globalState Semaphore when called.
+void SendStroke(BrushStroke_t * stroke){
 
 }
 
-void ReceiveStroke(){
+//Already has globalState Semaphore when called.
+void ReceiveStroke(BrushStroke_t * stroke){
+
+}
+
+inline void abs(){
 
 }
 

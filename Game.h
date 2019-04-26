@@ -22,8 +22,6 @@
 /* Semaphores here */ 
 semaphore_t cc3100;
 semaphore_t lcd;
-semaphore_t screenSelf;
-semaphore_t screenFriend;
 semaphore_t globalState;
 
 /*********************************************** Externs ********************************************************************/
@@ -31,16 +29,16 @@ semaphore_t globalState;
 /*********************************************** Global Defines ********************************************************************/
 
 /* Size of game arena */
-#define DRAWABLE_MIN_X                  100
-#define DRAWABLE_MAX_X                  200
-#define DRAWABLE_MIN_Y                  100
-#define DRAWABLE_MAX_Y                  200
+#define DRAWABLE_MIN_X                  033
+#define DRAWABLE_MAX_X                  287
+#define DRAWABLE_MIN_Y                  020
+#define DRAWABLE_MAX_Y                  220
 
 /* Size of objects */
 #define BRUSH_MAX                       1
 #define BRUSH_MIN                       32
 
-#define MAX_UNDO                        16
+#define MAX_STROKES                     16
 
 /* Background color - Black */
 #define BACK_COLOR                   LCD_BLACK
@@ -51,6 +49,8 @@ semaphore_t globalState;
 /* Used as status LEDs for Wi-Fi */
 #define BLUE_LED BIT2
 #define RED_LED BIT0
+
+#define MIN_DIST 16
 
 typedef enum {
     point,
@@ -90,11 +90,7 @@ typedef struct{
 }BrushStroke_t;
 
 typedef struct{
-    Pixel_t board[((DRAWABLE_MAX_X-DRAWABLE_MIN_X)>>1)*((DRAWABLE_MAX_Y-DRAWABLE_MIN_Y)>>1)];
-}Board_t;
-
-typedef struct{
-    BrushStroke_t strokes[MAX_UNDO];
+    BrushStroke_t strokes[MAX_STROKES];
 }StrokeQueue_t;
 
 /*
@@ -111,14 +107,12 @@ typedef struct{
 typedef struct{
     uint32_t ip;
     Brush_t currentBrush;
-    Board_t selfBoard;
-    Board_t friendBoard;
     StrokeQueue_t selfQueue;
     StrokeQueue_t friendQueue;
+    uin16_t stackPos;
+    uint16_t friendStackPos;
     uint8_t currentBoard;
-    ScreenPos_t touch;
     int8_t lastSentStroke;
-    int8_t lastDrawnStroke;
     uint8_t redrawBoard;
 } GameState_t;
 
@@ -170,11 +164,11 @@ void DrawBoard();
 
 void RedrawStrokes();
 
-void DrawStroke();
+void DrawStroke(BrushStroke_t * stroke);
 
-void SendStroke();
+void SendStroke(BrushStroke_t * stroke);
 
-void ReceiveStroke();
+void ReceiveStroke(BrushStroke_t * stroke);
 
 /*********************************************** Public Functions *********************************************************************/
 
