@@ -106,18 +106,39 @@ void IdleThread(){
     NVIC_EnableIRQ(PORT5_IRQn);
  }
 
+bool connected = false;
+bool decreaseBrush = false;
+bool increaseBrush = false;
 void PORT4_IRQHandler(){
-    isHost = true;  //b0 pressed
-    P4->IE &= ~BIT4;
-    P5->IE &= ~BIT4;
-    P4->IFG &= ~BIT4;  
+    if((P4->IFG & BIT4 == BIT4) && !connected){     //if top button (b0) pressed and not connected yet
+        isHost = true;
+        connected = true;
+        P4->IFG &= ~BIT4;   //clr flag 4.4
+    }
+    else if((P4->IFG & BIT4 == BIT4) && connected){   //top button pressed and connected, then viewFriendScreen
+        board.currentBoard = FRIEND;
+        P4->IFG &= ~BIT4;   //clr flag 4.4
+    }
+    else if(P4->IFG & BIT5 == BIT5){    //right button pressed, increase brush size
+        increaseBrush = true;
+        P4->IFG &= ~BIT5;   //clr flag 4.5
+    }
 }
 
 void PORT5_IRQHandler(){
-    isClient = true;    //b2 pressed
-    P4->IE &= ~BIT4;
-    P5->IE &= ~BIT4;
-    P5->IFG &= ~BIT4; 
+    if((P5->IFG & BIT4 == BIT4) && !connected){     //if bottom button (b2) pressed and not connected yet
+        isClient = true;
+        connected = true;
+        P5->IFG &= ~BIT4;   //clr flag 5.4
+    }
+    else if((P5->IFG & BIT4 == BIT4) && connected){   //bottom button pressed and connected, then viewOwnScreen
+        board.currentBoard = SELF;
+        P5->IFG &= ~BIT4;   //clr flag 5.4
+    }
+    else if(P5->IFG & BIT5 == BIT5){    //left button pressed, decrease brush size
+        decreaseBrush = true;
+        P5->IFG &= ~BIT5;   //clr flag 5.5
+    }
 }
 
 void WaitInit(){
