@@ -14,6 +14,7 @@
 #include "G8RTOS/G8RTOS.h"
 #include "cc3100_usage.h"
 #include <G8RTOS_IPC.h>
+#include <G8RTOS_CriticalSection.h>
 #include "LCDLib.h"
 /*********************************************** Includes ********************************************************************/
 
@@ -38,10 +39,11 @@ semaphore_t globalState;
 #define BRUSH_MAX                       1
 #define BRUSH_MIN                       32
 
-#define MAX_STROKES                     16
+#define MAX_STROKES                     4096
 
 /* Background color - Black */
 #define BACK_COLOR                   LCD_BLACK
+#define DRAW_COLOR                   LCD_WHITE
 
 #define SELF 0
 #define FRIEND 1
@@ -51,6 +53,9 @@ semaphore_t globalState;
 #define RED_LED BIT0
 
 #define MIN_DIST 16
+
+#define DEFAULT_BRUSH_COLOR                LCD_BLACK
+#define DEFAULT_BRUSH_SIZE                 8
 
 typedef enum {
     point,
@@ -66,7 +71,7 @@ typedef enum {
 #pragma pack ( pop )
 
 typedef struct{
-    uint8_t c;
+    uint16_t c;
 }Color_t;
 
 typedef struct{
@@ -109,11 +114,11 @@ typedef struct{
     Brush_t currentBrush;
     StrokeQueue_t selfQueue;
     StrokeQueue_t friendQueue;
-    uin16_t stackPos;
+    uint16_t stackPos;
     uint16_t friendStackPos;
     uint8_t currentBoard;
-    int8_t lastSentStroke;
-    uint8_t redrawBoard;
+    int16_t lastSentStroke;
+    uint16_t undo;
 } GameState_t;
 
 
@@ -131,11 +136,8 @@ void Send();
 void Receive();
 
 /*
- * Read touchpad data into lastTouch
+ * Process touchpad data into lastTouch
  */
-
-void ReadTouch();
-
 void ProcessTouch();
 
 /*
@@ -168,7 +170,11 @@ void DrawStroke(BrushStroke_t * stroke);
 
 void SendStroke(BrushStroke_t * stroke);
 
+void Undo();
+
 void ReceiveStroke(BrushStroke_t * stroke);
+
+void DrawInfo();
 
 /*********************************************** Public Functions *********************************************************************/
 
