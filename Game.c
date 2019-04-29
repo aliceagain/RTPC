@@ -12,6 +12,10 @@ char joyName[] = "Joystick";
 
 StrokeQueue_t selfQueue;
 StrokeQueue_t friendQueue;
+/* Semaphores here */
+semaphore_t cc3100;
+semaphore_t lcd;
+semaphore_t globalState;
 
 /*********************************************** Common Threads *********************************************************************/
 
@@ -80,7 +84,7 @@ void ReadJoystick(){
 
 
 void Draw(){
-  uint8_t prevBoard = -1;
+  uint8_t prevBoard = (uint8_t) -1;
   uint16_t lastStackPosition = 0;
   uint16_t lastFriendStackPosition = 0;
   Brush_t prevBrush;
@@ -91,8 +95,10 @@ void Draw(){
             DrawStroke(&selfQueue.strokes[lastStackPosition]);
           }
         }else if(state.stackPos < lastStackPosition){
-            lastStackPosition = state.stackPos;
-            DrawBoard();
+            lastStackPosition--;
+            selfQueue.strokes[lastStackPosition].brush.color.c = DRAW_COLOR;
+            DrawStroke(&selfQueue.strokes[lastStackPosition]);
+//            DrawBoard();
             RedrawStrokes();
         }
       }else if(prevBoard == state.currentBoard && state.currentBoard == FRIEND){
@@ -101,8 +107,10 @@ void Draw(){
             DrawStroke(&friendQueue.strokes[lastFriendStackPosition]);
           }
         }else if(state.stackPos < lastFriendStackPosition){
-            lastFriendStackPosition = state.friendStackPos;
-            DrawBoard();
+            lastFriendStackPosition--;
+            selfQueue.strokes[lastFriendStackPosition].brush.color.c = DRAW_COLOR;
+            DrawStroke(&selfQueue.strokes[lastFriendStackPosition]);
+//            DrawBoard();
             RedrawStrokes();
         }
       }else if(prevBoard != state.currentBoard){
