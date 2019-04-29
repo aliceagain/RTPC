@@ -34,11 +34,12 @@
 #define BRUSH_MAX                       1
 #define BRUSH_MIN                       32
 
-#define MAX_STROKES                     4096
+#define MAX_STROKES                     6300
 
 /* Background color - Black */
 #define BACK_COLOR                   LCD_BLACK
 #define DRAW_COLOR                   LCD_WHITE
+#define DRAW_COLOR_INDEX             64
 
 #define SELF 0
 #define FRIEND 1
@@ -50,6 +51,7 @@
 #define MIN_DIST 16
 
 #define DEFAULT_BRUSH_COLOR                LCD_BLACK
+#define DEFAULT_BRUSH_COLOR_INDEX          192
 #define DEFAULT_BRUSH_SIZE                 8
 
 typedef enum {
@@ -66,7 +68,7 @@ typedef enum {
 #pragma pack ( pop )
 
 typedef struct{
-    uint16_t c;
+    uint8_t c;
 }Color_t;
 
 typedef struct{
