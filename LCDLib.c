@@ -563,7 +563,7 @@ uint16_t TP_ReadY(){
     SPISendRecvByte(CHY);
     val = SPISendRecvByte(0) << 5;
     val |= SPISendRecvByte(0) >> 3;
-    val = (val-255)*MAX_SCREEN_Y/(4095-255);
+    val = (val-300)*MAX_SCREEN_Y/(4095-300);
     SPI_CS_TP_HIGH;
 
     MAP_CS_initClockSignal(CS_SMCLK, CS_HFXTCLK_SELECT, CS_CLOCK_DIVIDER_4);    //Resets SMCLK to 12 MHz

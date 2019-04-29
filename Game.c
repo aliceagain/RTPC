@@ -47,10 +47,11 @@ void ProcessTouch(){
   uint16_t lastX;
   uint16_t lastY;
   while(1){
-    if(touchReceived){
+//    if(touchReceived){
+      if(true){
       touchX = TP_ReadX();
       touchY = TP_ReadY();
-      touchReceived = false;
+//      touchReceived = false;
         G8RTOS_WaitSemaphore(&globalState);
         if(touchX > DRAWABLE_MIN_X && touchX < DRAWABLE_MAX_X &&
            touchY > DRAWABLE_MIN_Y && touchY < DRAWABLE_MAX_Y){
@@ -61,12 +62,14 @@ void ProcessTouch(){
             selfQueue.strokes[state.stackPos].pos.y = touchY - DRAWABLE_MIN_Y;
             selfQueue.strokes[state.stackPos].brush.color = state.currentBrush.color;
             selfQueue.strokes[state.stackPos].brush.size = state.currentBrush.size;
-            state.stackPos++;
+            if(state.stackPos < MAX_STROKES){
+                state.stackPos++;
+            }
           }
         }
         G8RTOS_SignalSemaphore(&globalState);
     }
-    sleep(4);
+    sleep(10);
   }
 }
 
@@ -95,10 +98,12 @@ void Draw(){
             DrawStroke(&selfQueue.strokes[lastStackPosition]);
           }
         }else if(state.stackPos < lastStackPosition){
-            lastStackPosition--;
-            selfQueue.strokes[lastStackPosition].brush.color.c = DRAW_COLOR;
-            DrawStroke(&selfQueue.strokes[lastStackPosition]);
-//            DrawBoard();
+            while(state.stackPos < lastStackPosition){
+                lastStackPosition--;
+                selfQueue.strokes[lastStackPosition].brush.color.c = DRAW_COLOR;
+                DrawStroke(&selfQueue.strokes[lastStackPosition]);
+            }
+//           DrawBoard();
             RedrawStrokes();
         }
       }else if(prevBoard == state.currentBoard && state.currentBoard == FRIEND){
@@ -107,10 +112,12 @@ void Draw(){
             DrawStroke(&friendQueue.strokes[lastFriendStackPosition]);
           }
         }else if(state.stackPos < lastFriendStackPosition){
-            lastFriendStackPosition--;
-            selfQueue.strokes[lastFriendStackPosition].brush.color.c = DRAW_COLOR;
-            DrawStroke(&selfQueue.strokes[lastFriendStackPosition]);
-//            DrawBoard();
+            while(state.stackPos < lastFriendStackPosition){
+                lastFriendStackPosition--;
+                selfQueue.strokes[lastFriendStackPosition].brush.color.c = DRAW_COLOR;
+                DrawStroke(&selfQueue.strokes[lastFriendStackPosition]);
+            }
+//          DrawBoard();
             RedrawStrokes();
         }
       }else if(prevBoard != state.currentBoard){
