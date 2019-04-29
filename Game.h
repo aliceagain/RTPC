@@ -173,6 +173,8 @@ void ReceiveStroke(BrushStroke_t * stroke);
 
 void DrawInfo();
 
+void RedrawStrokesNear(ScreenPos_t pos, uint8_t dist);
+
 /*********************************************** Public Functions *********************************************************************/
 
 

@@ -135,28 +135,32 @@ void Draw(){
                 lastStackPosition--;
                 selfQueue.strokes[lastStackPosition].brush.color.c = DRAW_COLOR_INDEX;
                 DrawStroke(&selfQueue.strokes[lastStackPosition]);
+                RedrawStrokesNear(selfQueue.strokes[lastStackPosition].pos, selfQueue.strokes[lastStackPosition].brush.size);
             }
 //           DrawBoard();
-            RedrawStrokes();
+//            RedrawStrokes();
         }
       }else if(prevBoard == state.currentBoard && state.currentBoard == FRIEND){
-        if(state.stackPos > lastFriendStackPosition){
-          for(; state.stackPos > lastFriendStackPosition; lastFriendStackPosition++){
+        if(state.friendStackPos > lastFriendStackPosition){
+          for(; state.friendStackPos > lastFriendStackPosition; lastFriendStackPosition++){
             DrawStroke(&friendQueue.strokes[lastFriendStackPosition]);
           }
-        }else if(state.stackPos < lastFriendStackPosition){
-            while(state.stackPos < lastFriendStackPosition){
+        }else if(state.friendStackPos < lastFriendStackPosition){
+            while(state.friendStackPos < lastFriendStackPosition){
                 lastFriendStackPosition--;
-                selfQueue.strokes[lastFriendStackPosition].brush.color.c = DRAW_COLOR_INDEX;
-                DrawStroke(&selfQueue.strokes[lastFriendStackPosition]);
+                friendQueue.strokes[lastFriendStackPosition].brush.color.c = DRAW_COLOR_INDEX;
+                DrawStroke(&friendQueue.strokes[lastFriendStackPosition]);
+                RedrawStrokesNear(friendQueue.strokes[lastFriendStackPosition].pos, friendQueue.strokes[lastFriendStackPosition].brush.size<<2);
             }
 //          DrawBoard();
-            RedrawStrokes();
+//            RedrawStrokes();
         }
       }else if(prevBoard != state.currentBoard){
         DrawBoard();
         RedrawStrokes();
         prevBoard = state.currentBoard;
+        lastFriendStackPosition = state.friendStackPos;
+        lastStackPosition = state.stackPos;
       }
       if(prevBrush.color.c != state.currentBrush.color.c ||
         prevBrush.size != state.currentBrush.size){
@@ -357,6 +361,32 @@ void DrawStroke(BrushStroke_t * stroke){
                     stroke->pos.y + DRAWABLE_MIN_Y + (stroke->brush.size>>1),
                     colorwheel[stroke->brush.color.c]);
   //LCD_DrawCircle here
+}
+
+void RedrawStrokesNear(ScreenPos_t pos, uint8_t dist){
+    G8RTOS_WaitSemaphore(&globalState);
+    BrushStroke_t * queue;
+    uint16_t top;
+    switch(state.currentBoard){
+      case SELF:
+        queue = &selfQueue.strokes[0];
+        top = state.stackPos;
+        break;
+      case FRIEND:
+        queue = &friendQueue.strokes[0];
+        top = state.friendStackPos;
+        break;
+      default:
+        G8RTOS_SignalSemaphore(&globalState);
+        return;
+    }
+    G8RTOS_WaitSemaphore(&lcd);
+    for(int i = 0; i < top; i++){
+      if(abs(queue[i].pos.x-pos.x) < dist && abs(queue[i].pos.y-pos.y) < dist)
+          DrawStroke(&queue[i]);
+    }
+    G8RTOS_SignalSemaphore(&lcd);
+    G8RTOS_SignalSemaphore(&globalState);
 }
 
 void SendStroke(BrushStroke_t * stroke){
