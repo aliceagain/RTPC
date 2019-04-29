@@ -17,10 +17,13 @@ StrokeQueue_t friendQueue;
 
 void Send(){
   while(1){
-    for(; state.stackPos > state.lastSentStroke; state.lastSentStroke++){
-      SendStroke(&selfQueue.strokes[state.lastSentStroke]);
-      sleep(4);
-    }
+     if(state.undo){
+         Undo();
+         state.undo--;
+     }else if(state.stackPos > state.lastSentStroke){
+         SendStroke(&selfQueue.strokes[state.lastSentStroke]);
+         state.lastSentStroke++;
+     }
     sleep(10);
   }
 }
@@ -29,7 +32,7 @@ void Receive(){
   while(1){
     ReceiveStroke(&selfQueue.strokes[state.friendStackPos]);
     state.friendStackPos++;
-    sleep(2);
+    sleep(5);
   }
 }
 
@@ -68,7 +71,7 @@ void ReadJoystick(){
     int16_t joyY;
     while(1){
         GetJoystickCoordinates(&joyX, &joyY);
-        if(joyX > 4000 || joyY > 4000 || joyX < -4000 || joyY < -4000){
+        if(joyX > 7000 || joyY > 7000 || joyX < -7000 || joyY < -7000){
             state.currentBrush.color.c = (joyX & 0xff00) | (joyY & 0x00ff);
         }
         sleep(10);
@@ -82,17 +85,13 @@ void Draw(){
   uint16_t lastFriendStackPosition = 0;
   Brush_t prevBrush;
   while(1){
-    if(state.undo){
-      for(; state.undo > 0; state.undo--){
-        Undo();
-      }
-    }else{
       if(prevBoard == state.currentBoard && state.currentBoard == SELF){
         if(state.stackPos > lastStackPosition){
           for(; state.stackPos > lastStackPosition; lastStackPosition++){
             DrawStroke(&selfQueue.strokes[lastStackPosition]);
           }
         }else if(state.stackPos < lastStackPosition){
+            lastStackPosition = state.stackPos;
             DrawBoard();
             RedrawStrokes();
         }
@@ -102,6 +101,7 @@ void Draw(){
             DrawStroke(&friendQueue.strokes[lastFriendStackPosition]);
           }
         }else if(state.stackPos < lastFriendStackPosition){
+            lastFriendStackPosition = state.friendStackPos;
             DrawBoard();
             RedrawStrokes();
         }
@@ -110,14 +110,13 @@ void Draw(){
         RedrawStrokes();
         prevBoard = state.currentBoard;
       }
-    }
-    if(prevBrush.color.c != state.currentBrush.color.c ||
-       prevBrush.size != state.currentBrush.size){
-      prevBrush.color.c = state.currentBrush.color.c;
-       prevBrush.size = state.currentBrush.size;
+      if(prevBrush.color.c != state.currentBrush.color.c ||
+        prevBrush.size != state.currentBrush.size){
+        prevBrush.color.c = state.currentBrush.color.c;
+        prevBrush.size = state.currentBrush.size;
        DrawInfo();
-    }
-    sleep(10);
+      }
+      sleep(10);
   }
 }
 
@@ -198,7 +197,10 @@ void PORT5_IRQHandler(){
         P5->IFG &= ~BIT4;   //clr flag 5.4
     }
     else if((P5->IFG & BIT4) && connected && (state.currentBoard == SELF)){   //bottom button pressed, already on self, so UNDO
-        state.undo++;
+        if(state.stackPos > 0){
+            state.undo++;
+            state.stackPos--;
+        }
         P5->IFG &= ~BIT4;   //clr flag 5.4
     }
     else if(P5->IFG & BIT5){    //left button pressed, decrease brush size
