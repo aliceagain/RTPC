@@ -112,8 +112,6 @@ typedef struct{
 typedef struct{
     uint32_t ip;
     Brush_t currentBrush;
-    StrokeQueue_t selfQueue;
-    StrokeQueue_t friendQueue;
     uint16_t stackPos;
     uint16_t friendStackPos;
     uint8_t currentBoard;
@@ -139,6 +137,8 @@ void Receive();
  * Process touchpad data into lastTouch
  */
 void ProcessTouch();
+
+void ReadJoystick();
 
 /*
  * Draw pixels/boardstate
