@@ -302,6 +302,7 @@ void Accel(){
         bmi160_read_accel_x(&x);
         bmi160_read_accel_y(&y);
         if(abs(x) > 14000 && abs(y) > 14000 ){
+            state.lastSentStroke = 0;
             state.stackPos = 0;
             G8RTOS_WaitSemaphore(&cc3100);
             Packet_t send;
@@ -399,17 +400,17 @@ void DrawStroke(BrushStroke_t * stroke){
   uint16_t xEnd = stroke->pos.x + DRAWABLE_MIN_X + (stroke->brush.size>>1);
   uint16_t yStart = stroke->pos.y + DRAWABLE_MIN_Y - (stroke->brush.size>>1);
   uint16_t yEnd = stroke->pos.y + DRAWABLE_MIN_Y + (stroke->brush.size>>1);
-  if(xStart < DRAWABLE_MIN_X){
+  if(xStart < DRAWABLE_MIN_X || xStart > 10000){
       xStart = DRAWABLE_MIN_X;
   }
   if(xEnd > DRAWABLE_MAX_X){
       xEnd = DRAWABLE_MAX_X;
   }
-  if(yStart < DRAWABLE_MIN_Y){
+  if(yStart < DRAWABLE_MIN_Y || yStart > 10000){
       yStart = DRAWABLE_MIN_Y;
   }
-  if(yEnd > DRAWABLE_MAX_X){
-      yEnd = DRAWABLE_MAX_X;
+  if(yEnd > DRAWABLE_MAX_Y){
+      yEnd = DRAWABLE_MAX_Y;
   }
   LCD_DrawRectangle(xStart, xEnd, yStart, yEnd,
                     colorwheel[stroke->brush.color.c]);
