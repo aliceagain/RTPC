@@ -402,13 +402,13 @@ void DrawStroke(BrushStroke_t * stroke){
   if(xStart < DRAWABLE_MIN_X){
       xStart = DRAWABLE_MIN_X;
   }
-  if(xEnd < DRAWABLE_MAX_X){
+  if(xEnd > DRAWABLE_MAX_X){
       xEnd = DRAWABLE_MAX_X;
   }
   if(yStart < DRAWABLE_MIN_Y){
       yStart = DRAWABLE_MIN_Y;
   }
-  if(yEnd < DRAWABLE_MAX_X){
+  if(yEnd > DRAWABLE_MAX_X){
       yEnd = DRAWABLE_MAX_X;
   }
   LCD_DrawRectangle(xStart, xEnd, yStart, yEnd,
