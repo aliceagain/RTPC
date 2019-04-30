@@ -39,7 +39,7 @@
 /* Background color - Black */
 #define BACK_COLOR                   LCD_BLACK
 #define DRAW_COLOR                   LCD_WHITE
-#define DRAW_COLOR_INDEX             64
+#define DRAW_COLOR_INDEX             0
 
 #define SELF 0
 #define FRIEND 1
@@ -51,7 +51,7 @@
 #define MIN_DIST 16
 
 #define DEFAULT_BRUSH_COLOR                LCD_BLACK
-#define DEFAULT_BRUSH_COLOR_INDEX          192
+#define DEFAULT_BRUSH_COLOR_INDEX          255
 #define DEFAULT_BRUSH_SIZE                 8
 #define MAX_BRUSH_SIZE                     64
 #define MIN_BRUSH_SIZE                     2
