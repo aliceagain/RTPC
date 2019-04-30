@@ -81,7 +81,7 @@ void ProcessTouch(){
   uint16_t lastY;
   while(1){
 //    if(touchReceived){
-      if(true){
+      if(state.currentBoard == SELF){
       touchX = TP_ReadX();
       touchY = TP_ReadY();
 //      touchReceived = false;
@@ -110,9 +110,11 @@ void ReadJoystick(){
     int16_t joyX;
     int16_t joyY;
     while(1){
-        GetJoystickCoordinates(&joyX, &joyY);
-        if(joyX > 8000 || joyY > 8000 || joyX < -6800 || joyY < -8000){
-            state.currentBrush.color.c = (joyX>>8) | (joyY>>12);
+        if(state.currentBoard == SELF){
+            GetJoystickCoordinates(&joyX, &joyY);
+            if(joyX > 8000 || joyY > 8000 || joyX < -6800 || joyY < -8000){
+                state.currentBrush.color.c = (joyX>>8) | (joyY>>12);
+            }
         }
         sleep(10);
     }
@@ -185,14 +187,16 @@ void IdleThread(){
  bool isClient = false;
 
  inline void initInterrupts(){
-    //Button Init 4.4 (b0 - top button) -> server/host AND viewFriendScreen
-    //Button Init 4.5 (b1 - right button) -> increasBrush
-    P4->DIR &= ~(BIT4 | BIT5);   //set as input
-    P4->IFG &= ~(BIT4 | BIT5);   //P4.4 IFG cleared
-    P4->IE |= (BIT4 | BIT5);     //Enable interrupt on P4.4
-    P4->IES |= (BIT4 | BIT5);    //falling edge triggered
-    P4->REN |= (BIT4 | BIT5);    //pull-up resistor
-    P4->OUT |= (BIT4 | BIT5);    //Sets res to pull-up
+     //Button Init 4.4 (b0 - top button) -> server/host AND viewFriendScreen
+     //Button Init 4.5 (b1 - right button) -> increasBrush
+     //Button Init 4.3 (joystick press) -> reset brush to default
+     //NOTE: touchpad interrupt (4.0) is initialized in LCDLib, but is currently disabled b/c LCD_init(false)
+     P4->DIR &= ~(BIT3 | BIT4 | BIT5);   //set as input
+     P4->IFG &= ~(BIT3 | BIT4 | BIT5);   //P4.4 IFG cleared
+     P4->IE  |= (BIT3 | BIT4 | BIT5);     //Enable interrupt on P4.4
+     P4->IES |= (BIT3 | BIT4 | BIT5);    //falling edge triggered
+     P4->REN |= (BIT3 | BIT4 | BIT5);    //pull-up resistor
+     P4->OUT |= (BIT3 | BIT4 | BIT5);    //Sets res to pull-up
 
     //Button Init 5.4 (b2 - bottom button) -> client AND viewOwnScreen
     //Button Init 5.5 (b3 - left button) -> decreaseBrush
@@ -208,8 +212,6 @@ void IdleThread(){
  }
 
 bool connected = false;
-bool decreaseBrush = false;
-bool increaseBrush = false;
 void PORT4_IRQHandler(){
     uint16_t cs_value = StartCriticalSection();
     if((P4->IFG & BIT4) && !connected){     //if top button (b0) pressed and not connected yet
@@ -219,19 +221,25 @@ void PORT4_IRQHandler(){
     }
     else if((P4->IFG & BIT4) && connected){   //top button pressed and connected, then viewFriendScreen
         state.currentBoard = FRIEND;
+        P4->IE &= ~(BIT3 | BIT4 | BIT5);    //disable interrupts that only need to be used when viewing ownScreen (top, right, joystick button)
+        P5->IE &= ~BIT5;    // ^^^ (disable left button interrupt)
+
         P4->IFG &= ~BIT4;   //clr flag 4.4
     }
-    else if(P4->IFG & BIT5){    //right button pressed, increase brush size
-        increaseBrush = true;
+    else if((P4->IFG & BIT5) && state.currentBoard == SELF){    //right button pressed, increase brush size
+        if(state.currentBrush.size < MAX_BRUSH_SIZE){
+            state.currentBrush.size = state.currentBrush.size << 1; //double in size, for now
+        }
         P4->IFG &= ~BIT5;   //clr flag 4.5
     }
-    else if(P4->IFG & BIT0){  //Touchpad press
-        touchReceived = true;
-        P4->IFG &= ~BIT0;
-    }
-    else if(P4->IFG & BIT3){ //joystick press -> reset brush to default
+//    else if((P4->IFG & BIT0) && state.currentBoard == SELF){  //Touchpad press
+//        touchReceived = true;
+//        P4->IFG &= ~BIT0;
+//    }
+    else if((P4->IFG & BIT3) && state.currentBoard == SELF){ //joystick press -> reset brush to default
         state.currentBrush.color.c = DEFAULT_BRUSH_COLOR_INDEX;
         state.currentBrush.size = DEFAULT_BRUSH_SIZE;
+        P4->IFG &= ~BIT3;
     }
     
     EndCriticalSection(cs_value);
@@ -246,6 +254,11 @@ void PORT5_IRQHandler(){
     }
     else if((P5->IFG & BIT4) && connected && (state.currentBoard != SELF)){   //bottom button pressed and connected, then viewOwnScreen
         state.currentBoard = SELF;
+        P4->IE  |= (BIT3 | BIT4 | BIT5);    //enable interrupts that are to be used only when viewingOwnScreen (top, right, joystick button)
+        P5->IE |= BIT5;     //^^^ (left button)
+        P4->IFG &= ~(BIT3 | BIT4 | BIT5);
+        P5->IFG &= ~BIT5;
+
         P5->IFG &= ~BIT4;   //clr flag 5.4
     }
     else if((P5->IFG & BIT4) && connected && (state.currentBoard == SELF)){   //bottom button pressed, already on self, so UNDO
@@ -255,8 +268,10 @@ void PORT5_IRQHandler(){
         }
         P5->IFG &= ~BIT4;   //clr flag 5.4
     }
-    else if(P5->IFG & BIT5){    //left button pressed, decrease brush size
-        decreaseBrush = true;
+    else if((P5->IFG & BIT5) && state.currentBoard == SELF){    //left button pressed, decrease brush size
+        if(state.currentBrush.size > MIN_BRUSH_SIZE){
+            state.currentBrush.size = state.currentBrush.size >> 1; //halve in size, for now
+        }
         P5->IFG &= ~BIT5;   //clr flag 5.5
     }
     EndCriticalSection(cs_value);
@@ -307,7 +322,7 @@ void InitClient(){
 }
 
 void CreateThreadsAndStart(){
-  LCD_Init(true);
+  LCD_Init(false);
   state.currentBrush.color.c = DEFAULT_BRUSH_COLOR_INDEX;
   state.currentBrush.size = DEFAULT_BRUSH_SIZE;
 
@@ -422,10 +437,11 @@ void ReceiveStroke(BrushStroke_t * stroke){
 
 void DrawInfo(){
   if(state.currentBoard == SELF){
-      BrushStroke_t current;
-      current.brush = state.currentBrush;
-      current.pos = (ScreenPos_t){0,0};
-      DrawStroke(&current);
+//      BrushStroke_t current;
+//      current.brush = state.currentBrush;
+//      current.pos = (ScreenPos_t){0,0};
+//      DrawStroke(&current);
+      LCD_DrawRectangle(0, 8, 0, 8, colorwheel[state.currentBrush.color.c]);
   }
 }
 

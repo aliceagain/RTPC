@@ -53,6 +53,8 @@
 #define DEFAULT_BRUSH_COLOR                LCD_BLACK
 #define DEFAULT_BRUSH_COLOR_INDEX          192
 #define DEFAULT_BRUSH_SIZE                 8
+#define MAX_BRUSH_SIZE                     64
+#define MIN_BRUSH_SIZE                     2
 
 typedef enum {
     point,
