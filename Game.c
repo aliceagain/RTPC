@@ -229,7 +229,7 @@ void PORT4_IRQHandler(){
     }
     else if((P4->IFG & BIT5) && state.currentBoard == SELF){    //right button pressed, increase brush size
         if(state.currentBrush.size < MAX_BRUSH_SIZE){
-            state.currentBrush.size = state.currentBrush.size << 1; //double in size, for now
+            state.currentBrush.size += 2;
         }
         P4->IFG &= ~BIT5;   //clr flag 4.5
     }
@@ -271,7 +271,7 @@ void PORT5_IRQHandler(){
     }
     else if((P5->IFG & BIT5) && state.currentBoard == SELF){    //left button pressed, decrease brush size
         if(state.currentBrush.size > MIN_BRUSH_SIZE){
-            state.currentBrush.size = state.currentBrush.size >> 1; //halve in size, for now
+            state.currentBrush.size -= 2;
         }
         P5->IFG &= ~BIT5;   //clr flag 5.5
     }
@@ -438,12 +438,11 @@ void ReceiveStroke(){
 }
 
 void DrawInfo(){
+  char brushsize[16] = "Size: 8";
   if(state.currentBoard == SELF){
-//      BrushStroke_t current;
-//      current.brush = state.currentBrush;
-//      current.pos = (ScreenPos_t){0,0};
-//      DrawStroke(&current);
       LCD_DrawRectangle(0, 8, 0, 8, colorwheel[state.currentBrush.color.c]);
+      sprintf(brushsize, "Size: %d", state.currentBrush.size);
+      LCD_Text(0, 220, (uint8_t*)brushsize, LCD_WHITE);
   }
 }
 
