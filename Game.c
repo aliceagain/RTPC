@@ -279,15 +279,15 @@ void PORT5_IRQHandler(){
 
 void WaitInit(){
     initInterrupts();
-//    while(!(isHost || isClient));
+    while(!(isHost || isClient));
     G8RTOS_InitSemaphore(&cc3100, 1);
     G8RTOS_InitSemaphore(&lcd, 1);
     G8RTOS_InitSemaphore(&globalState, 1);
-//    if(isHost){
-//        InitHost();
-//    }else if(isClient){
-//        InitClient();
-//    }
+    if(isHost){
+        InitHost();
+    }else if(isClient){
+        InitClient();
+    }
     CreateThreadsAndStart();
 
 }
@@ -326,8 +326,8 @@ void CreateThreadsAndStart(){
   state.currentBrush.color.c = DEFAULT_BRUSH_COLOR_INDEX;
   state.currentBrush.size = DEFAULT_BRUSH_SIZE;
 
-//  G8RTOS_AddThread(Send, 6, sendDataName);   // *** add priorities ***
-//  G8RTOS_AddThread(Receive, 5, receiveDataName);
+  G8RTOS_AddThread(Send, 6, sendDataName);   // *** add priorities ***
+  G8RTOS_AddThread(Receive, 5, receiveDataName);
   G8RTOS_AddThread(IdleThread, 254, idlethreadName);
   G8RTOS_AddThread(Draw, 3, drawName);
   G8RTOS_AddThread(ProcessTouch, 4, processTouchName);
