@@ -67,8 +67,9 @@ void Send(){
 
 void Receive(){
   while(1){
-    ReceiveStroke(&selfQueue.strokes[state.friendStackPos]);
-    state.friendStackPos++;
+    if(state.friendStackPos < MAX_STROKES){
+        ReceiveStroke();
+    }
     sleep(5);
   }
 }
@@ -124,7 +125,7 @@ void ReadJoystick(){
 void Draw(){
   uint8_t prevBoard = (uint8_t) -1;
   uint16_t lastStackPosition = 0;
-  uint16_t lastFriendStackPosition = 0;
+  uint16_t lastFriendStackPosition = FRIEND_OFFSET;
   Brush_t prevBrush;
   while(1){
       if(prevBoard == state.currentBoard && state.currentBoard == SELF){
@@ -279,6 +280,7 @@ void PORT5_IRQHandler(){
 
 void WaitInit(){
     initInterrupts();
+    LCD_Init(false);
     while(!(isHost || isClient));
     G8RTOS_InitSemaphore(&cc3100, 1);
     G8RTOS_InitSemaphore(&lcd, 1);
@@ -322,9 +324,9 @@ void InitClient(){
 }
 
 void CreateThreadsAndStart(){
-  LCD_Init(false);
   state.currentBrush.color.c = DEFAULT_BRUSH_COLOR_INDEX;
   state.currentBrush.size = DEFAULT_BRUSH_SIZE;
+  state.friendStackPos = FRIEND_OFFSET;
 
   G8RTOS_AddThread(Send, 6, sendDataName);   // *** add priorities ***
   G8RTOS_AddThread(Receive, 5, receiveDataName);
@@ -348,6 +350,7 @@ void RedrawStrokes(){
   G8RTOS_WaitSemaphore(&globalState);
   BrushStroke_t * queue;
   uint16_t top;
+  uint16_t current = 0;
   switch(state.currentBoard){
     case SELF:
       queue = &selfQueue.strokes[0];
@@ -356,14 +359,15 @@ void RedrawStrokes(){
     case FRIEND:
       queue = &friendQueue.strokes[0];
       top = state.friendStackPos;
+      current = FRIEND_OFFSET;
       break;
     default:
       G8RTOS_SignalSemaphore(&globalState);
       return;
   }
   G8RTOS_WaitSemaphore(&lcd);
-  for(int i = 0; i < top; i++){
-    DrawStroke(&queue[i]);
+  for(; current < top; current++){
+    DrawStroke(&queue[current]);
   }
   G8RTOS_SignalSemaphore(&lcd);
   G8RTOS_SignalSemaphore(&globalState);
@@ -419,7 +423,7 @@ void Undo(){
   G8RTOS_SignalSemaphore(&cc3100);
 }
 
-void ReceiveStroke(BrushStroke_t * stroke){
+void ReceiveStroke(){
   G8RTOS_WaitSemaphore(&cc3100);
   Packet_t receive;
   while(ReceiveData((uint8_t *)&receive, sizeof(Packet_t)) == NOTHING_RECEIVED){
@@ -429,9 +433,8 @@ void ReceiveStroke(BrushStroke_t * stroke){
   }
   G8RTOS_SignalSemaphore(&cc3100);
   if(receive.header == point){
-    friendQueue.strokes[state.friendStackPos] = receive.stroke;
-  }else{
-    state.friendStackPos--;
+    friendQueue.strokes[state.friendStackPos+FRIEND_OFFSET] = receive.stroke;
+    state.friendStackPos++;
   }
 }
 

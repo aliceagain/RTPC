@@ -34,7 +34,7 @@
 #define BRUSH_MAX                       1
 #define BRUSH_MIN                       32
 
-#define MAX_STROKES                     6300
+#define MAX_STROKES                     4096
 
 /* Background color - Black */
 #define BACK_COLOR                   LCD_BLACK
@@ -55,6 +55,8 @@
 #define DEFAULT_BRUSH_SIZE                 8
 #define MAX_BRUSH_SIZE                     64
 #define MIN_BRUSH_SIZE                     2
+
+#define FRIEND_OFFSET                      57
 
 typedef enum {
     point,
@@ -171,7 +173,7 @@ void SendStroke(BrushStroke_t * stroke);
 
 void Undo();
 
-void ReceiveStroke(BrushStroke_t * stroke);
+void ReceiveStroke();
 
 void DrawInfo();
 
