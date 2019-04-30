@@ -299,8 +299,10 @@ void Accel(){
     int16_t x;
     int16_t y;
     while(1){
+        G8RTOS_WaitSemaphore(&cc3100);
         bmi160_read_accel_x(&x);
         bmi160_read_accel_y(&y);
+        G8RTOS_SignalSemaphore(&cc3100);
         if(abs(x) > 14000 && abs(y) > 14000 ){
             state.lastSentStroke = 0;
             state.stackPos = 0;
