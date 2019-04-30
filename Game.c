@@ -70,7 +70,7 @@ void Receive(){
     if(state.friendStackPos < MAX_STROKES){
         ReceiveStroke();
     }
-    sleep(5);
+    sleep(8);
   }
 }
 
@@ -426,15 +426,14 @@ void Undo(){
 void ReceiveStroke(){
   G8RTOS_WaitSemaphore(&cc3100);
   Packet_t receive;
-  while(ReceiveData((uint8_t *)&receive, sizeof(Packet_t)) == NOTHING_RECEIVED){
-    G8RTOS_SignalSemaphore(&cc3100);
-    sleep(1);
-    G8RTOS_WaitSemaphore(&cc3100);
-  }
-  G8RTOS_SignalSemaphore(&cc3100);
-  if(receive.header == point){
-    friendQueue.strokes[state.friendStackPos+FRIEND_OFFSET] = receive.stroke;
-    state.friendStackPos++;
+  if(ReceiveData((uint8_t *)&receive, sizeof(Packet_t)) == NOTHING_RECEIVED){
+      G8RTOS_SignalSemaphore(&cc3100);
+  }else{
+      G8RTOS_SignalSemaphore(&cc3100);
+      if(receive.header == point){
+        friendQueue.strokes[state.friendStackPos+FRIEND_OFFSET] = receive.stroke;
+        state.friendStackPos++;
+      }
   }
 }
 
