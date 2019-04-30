@@ -481,7 +481,7 @@ void DrawInfo(){
   char brushsize[16] = "Size: 8";
   if(state.currentBoard == SELF){
       LCD_DrawRectangle(0, 20, 0, 20, LCD_WHITE);
-      LCD_DrawRectangle(10, 18, 10, 18, colorwheel[state.currentBrush.color.c]);
+      LCD_DrawRectangle(6, 14, 6, 14, colorwheel[state.currentBrush.color.c]);
       LCD_DrawRectangle(0, 64, DRAWABLE_MAX_Y, 240, LCD_BLACK);
       sprintf(brushsize, "Size: %d", state.currentBrush.size);
       LCD_Text(0, 220, (uint8_t*)brushsize, LCD_WHITE);
