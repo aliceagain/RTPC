@@ -9,6 +9,7 @@ char sendDataName[] = "sendData";
 char receiveDataName[] = "receiveData";
 char drawName[] = "Draw";
 char joyName[] = "Joystick";
+char accelName[] = "Accel";
 
 StrokeQueue_t selfQueue;
 StrokeQueue_t friendQueue;
@@ -78,8 +79,8 @@ bool touchReceived;
 void ProcessTouch(){
   uint16_t touchX;
   uint16_t touchY;
-  uint16_t lastX;
-  uint16_t lastY;
+//  uint16_t lastX;
+//  uint16_t lastY;
   while(1){
 //    if(touchReceived){
       if(state.currentBoard == SELF){
@@ -89,9 +90,9 @@ void ProcessTouch(){
         G8RTOS_WaitSemaphore(&globalState);
         if(touchX > DRAWABLE_MIN_X && touchX < DRAWABLE_MAX_X &&
            touchY > DRAWABLE_MIN_Y && touchY < DRAWABLE_MAX_Y){
-          if(abs((int16_t)touchX-lastX) > MIN_DIST || abs((int16_t)touchX-lastY) > MIN_DIST){
-            lastX = touchX;
-            lastY = touchY;
+//          if(abs((int16_t)touchX-lastX) > MIN_DIST || abs((int16_t)touchX-lastY) > MIN_DIST){
+//            lastX = touchX;
+//            lastY = touchY;
             selfQueue.strokes[state.stackPos].pos.x = touchX - DRAWABLE_MIN_X;
             selfQueue.strokes[state.stackPos].pos.y = touchY - DRAWABLE_MIN_Y;
             selfQueue.strokes[state.stackPos].brush.color = state.currentBrush.color;
@@ -99,7 +100,7 @@ void ProcessTouch(){
             if(state.stackPos < MAX_STROKES){
                 state.stackPos++;
             }
-          }
+//          }
         }
         G8RTOS_SignalSemaphore(&globalState);
     }
@@ -294,6 +295,24 @@ void WaitInit(){
 
 }
 
+void Accel(){
+    int16_t x;
+    int16_t y;
+    while(1){
+        bmi160_read_accel_x(&x);
+        bmi160_read_accel_y(&y);
+        if(abs(x) > 14000 && abs(y) > 14000 ){
+            state.stackPos = 0;
+            G8RTOS_WaitSemaphore(&cc3100);
+            Packet_t send;
+            send.header = clear;
+            SendData((uint8_t *)&send, state.ip, sizeof(Packet_t));
+            G8RTOS_SignalSemaphore(&cc3100);
+        }
+        sleep(6);
+    }
+}
+
 /*********************************************** Common Threads *********************************************************************/
 
 
@@ -315,6 +334,7 @@ void InitClient(){
   state.ip = getLocalIP();
 
   SendData((uint8_t *)&state.ip, HOST_IP_ADDR, sizeof(uint32_t));
+  state.ip = HOST_IP_ADDR;
 
   uint8_t temp;
   while(ReceiveData(&temp, sizeof(uint8_t)) == NOTHING_RECEIVED);
@@ -334,6 +354,7 @@ void CreateThreadsAndStart(){
   G8RTOS_AddThread(Draw, 3, drawName);
   G8RTOS_AddThread(ProcessTouch, 4, processTouchName);
   G8RTOS_AddThread(ReadJoystick, 7, joyName);
+  G8RTOS_AddThread(Accel, 8, accelName);
 
   G8RTOS_KillSelf();
 }
@@ -374,10 +395,23 @@ void RedrawStrokes(){
 }
 
 void DrawStroke(BrushStroke_t * stroke){
-  LCD_DrawRectangle(stroke->pos.x + DRAWABLE_MIN_X - (stroke->brush.size>>1),
-                    stroke->pos.x + DRAWABLE_MIN_X + (stroke->brush.size>>1),
-                    stroke->pos.y + DRAWABLE_MIN_Y - (stroke->brush.size>>1),
-                    stroke->pos.y + DRAWABLE_MIN_Y + (stroke->brush.size>>1),
+  uint16_t xStart = stroke->pos.x + DRAWABLE_MIN_X - (stroke->brush.size>>1);
+  uint16_t xEnd = stroke->pos.x + DRAWABLE_MIN_X + (stroke->brush.size>>1);
+  uint16_t yStart = stroke->pos.y + DRAWABLE_MIN_Y - (stroke->brush.size>>1);
+  uint16_t yEnd = stroke->pos.y + DRAWABLE_MIN_Y + (stroke->brush.size>>1);
+  if(xStart < DRAWABLE_MIN_X){
+      xStart = DRAWABLE_MIN_X;
+  }
+  if(xEnd < DRAWABLE_MAX_X){
+      xEnd = DRAWABLE_MAX_X;
+  }
+  if(yStart < DRAWABLE_MIN_Y){
+      yStart = DRAWABLE_MIN_Y;
+  }
+  if(yEnd < DRAWABLE_MAX_X){
+      yEnd = DRAWABLE_MAX_X;
+  }
+  LCD_DrawRectangle(xStart, xEnd, yStart, yEnd,
                     colorwheel[stroke->brush.color.c]);
   //LCD_DrawCircle here
 }
@@ -431,8 +465,14 @@ void ReceiveStroke(){
   }else{
       G8RTOS_SignalSemaphore(&cc3100);
       if(receive.header == point){
-        friendQueue.strokes[state.friendStackPos+FRIEND_OFFSET] = receive.stroke;
+        friendQueue.strokes[state.friendStackPos] = receive.stroke;
         state.friendStackPos++;
+      }else if(receive.header == undo){
+          if(state.friendStackPos > FRIEND_OFFSET){
+              state.friendStackPos--;
+          }
+      }else if(receive.header == clear){
+          state.friendStackPos = FRIEND_OFFSET;
       }
   }
 }
@@ -440,7 +480,8 @@ void ReceiveStroke(){
 void DrawInfo(){
   char brushsize[16] = "Size: 8";
   if(state.currentBoard == SELF){
-      LCD_DrawRectangle(0, 8, 0, 8, colorwheel[state.currentBrush.color.c]);
+      LCD_DrawRectangle(0, 20, 0, 20, LCD_WHITE);
+      LCD_DrawRectangle(10, 18, 10, 18, colorwheel[state.currentBrush.color.c]);
       sprintf(brushsize, "Size: %d", state.currentBrush.size);
       LCD_Text(0, 220, (uint8_t*)brushsize, LCD_WHITE);
   }

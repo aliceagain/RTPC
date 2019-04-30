@@ -8,7 +8,7 @@
 #include "G8RTOS_Structures.h"
 #include "msp.h"
 /*********************************************** Sizes and Limits *********************************************************************/
-#define MAX_THREADS 8
+#define MAX_THREADS 9
 #define MAX_PERIODIC_THREADS 6
 #define STACKSIZE 256
 #define OSINT_PRIORITY 7

@@ -34,7 +34,7 @@
 #define BRUSH_MAX                       1
 #define BRUSH_MIN                       32
 
-#define MAX_STROKES                     4096
+#define MAX_STROKES                     6000
 
 /* Background color - Black */
 #define BACK_COLOR                   LCD_BLACK
@@ -60,7 +60,8 @@
 
 typedef enum {
     point,
-    undo
+    undo,
+    clear
 }PacketType;
 
 /*********************************************** Global Defines ********************************************************************/
@@ -152,6 +153,8 @@ void Draw();
 void WaitInit();
 
 void IdleThread();
+
+void Accel();
 
 /*******************************************************  Threads *********************************************************************/
 
